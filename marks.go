@@ -14,6 +14,22 @@ type mark struct {
 	discriminants []string
 }
 
+type markIdentity struct {
+	tag, family, discriminants string
+}
+
+func (m mark) identity() markIdentity {
+	return markIdentity{tag: m.tag, family: m.family, discriminants: strings.Join(m.discriminants, ",")}
+}
+
+func (m mark) String() string {
+	value := m.family
+	if len(m.discriminants) > 0 {
+		value += "," + strings.Join(m.discriminants, ",")
+	}
+	return fmt.Sprintf("%s:%q", m.tag, value)
+}
+
 type markFamily struct {
 	tag    string
 	family string
@@ -73,25 +89,6 @@ func compileMarkFamilies(locations []*location) (markFamilies, error) {
 		for _, qualifier := range location.qualifiers {
 			if _, conflict := families[family][qualifier.symbol]; conflict {
 				return nil, fmt.Errorf("location %v: qualifier %q conflicts with a discriminator in mark family %q/%q", location.typ, qualifier.symbol, family.tag, family.family)
-			}
-		}
-	}
-	for _, location := range locations {
-		for laneIndex, lane := range location.lanes {
-			type identity struct {
-				tag, family, discriminants string
-			}
-			seen := make(map[identity]int)
-			for spotIndex, spot := range lane.spots {
-				if spot.target == nil {
-					return nil, fmt.Errorf("location %v, lane %d, spot %d: missing target location", location.typ, laneIndex, spotIndex)
-				}
-				mark := spot.target.mark
-				key := identity{tag: mark.tag, family: mark.family, discriminants: strings.Join(mark.discriminants, ",")}
-				if previous, duplicate := seen[key]; duplicate {
-					return nil, fmt.Errorf("location %v, lane %d: spots %d and %d have ambiguous identical marks %q/%q with discriminants %v", location.typ, laneIndex, previous, spotIndex, mark.tag, mark.family, mark.discriminants)
-				}
-				seen[key] = spotIndex
 			}
 		}
 	}

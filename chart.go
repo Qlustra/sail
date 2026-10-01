@@ -11,9 +11,13 @@ import (
 type LaneExplorationStrategy string
 
 const (
-	ExploreEagerly        LaneExplorationStrategy = "eager"
-	ExploreConservatively LaneExplorationStrategy = "conservative"
-	ExploreFreely         LaneExplorationStrategy = "free"
+	// ExploreEagerly prefers the current lane when it accepts a field.
+	ExploreEagerly LaneExplorationStrategy = "eager"
+	// ExploreCuriously prefers a reachable subsequent lane that also accepts it.
+	ExploreCuriously LaneExplorationStrategy = "curious"
+	// ExploreUnambiguously requires structurally distinct lane choices. It is
+	// the default when the exploration tag is omitted.
+	ExploreUnambiguously LaneExplorationStrategy = "unambiguous"
 )
 
 type Lane struct {

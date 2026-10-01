@@ -20,12 +20,6 @@ type Codex struct {
 	Locations map[reflect.Type]*location
 }
 
-type lane struct {
-	schemaField []int
-	strategy    LaneExplorationStrategy
-	spots       []spot // Alternatives within the lane; their order is not policy.
-}
-
 type spot struct {
 	schemaField []int
 	kind        spotKind
@@ -60,6 +54,9 @@ func (w *World[C]) Explore() error {
 	}
 	families, err := compileMarkFamilies(exp.locations)
 	if err != nil {
+		return err
+	}
+	if err := validateLaneAmbiguity(exp.locations); err != nil {
 		return err
 	}
 
@@ -131,14 +128,6 @@ func (c *explorer) explore(t reflect.Type) (*location, error) {
 	return location, nil
 }
 
-// laneField retains the local inspection needed for later lane expansion.
-type laneField struct {
-	name        string
-	typ         reflect.Type
-	schemaField []int
-	strategy    LaneExplorationStrategy
-}
-
 // inspectDeclaration handles local validation and collection in declaration
 // order. It prepares lanes without following their spots into other locations.
 func (c *explorer) inspectDeclaration(location *location) ([]laneField, error) {
@@ -171,29 +160,11 @@ func (c *explorer) inspectDeclaration(location *location) ([]laneField, error) {
 			if location.role == landmarkRole {
 				return nil, fmt.Errorf("%v: a landmark cannot declare child lanes", t)
 			}
-			if !isLaneField(field) {
-				return nil, fmt.Errorf("%v.%s: lane must embed sail.Lane", t, field.Name)
-			}
-			laneType := utilities.ResolvePointerChain(field.Type)
-			if laneType == nil || laneType.Kind() != reflect.Struct {
-				return nil, fmt.Errorf("%v.%s: lane must resolve to a struct", t, field.Name)
-			}
-			value, err := readSingleTag(field.Tag, "exploration", nil)
+			lane, err := inspectLane(field)
 			if err != nil {
 				return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
 			}
-			strategy := LaneExplorationStrategy(value)
-			switch strategy {
-			case ExploreEagerly, ExploreConservatively, ExploreFreely:
-			default:
-				return nil, fmt.Errorf("%v.%s: invalid or missing exploration strategy %q", t, field.Name, strategy)
-			}
-			lanes = append(lanes, laneField{
-				name:        field.Name,
-				typ:         laneType,
-				schemaField: append([]int(nil), field.Index...),
-				strategy:    strategy,
-			})
+			lanes = append(lanes, lane)
 		default:
 			return nil, fmt.Errorf("%v.%s: unexpected schema role %q", t, field.Name, role)
 		}
