@@ -35,10 +35,10 @@ type spot struct {
 // ======================================== Exploration
 
 // Explore compiles C without inspecting or changing the live subject.
-func Explore[C chart, S any](subject *S) (*World[C], *S, error) {
+func Explore[C chart]() (*World[C], error) {
 	world := &World[C]{}
 	err := world.Explore()
-	return world, subject, err
+	return world, err
 }
 
 // Explore publishes a complete schema only after all locations and mark
