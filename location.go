@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/Qlustra/sail/internals/utilities"
+	"github.com/qlustra/sail/internals/utilities"
 )
 
 type locationRole string

@@ -3,7 +3,7 @@ package sail
 import (
 	"reflect"
 
-	"github.com/Qlustra/sail/internals/utilities"
+	"github.com/qlustra/sail/internals/utilities"
 )
 
 type reflectable[T familyMarker] struct {
