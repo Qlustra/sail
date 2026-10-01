@@ -6,15 +6,6 @@ import (
 	"github.com/qlustra/sail/internals/utilities"
 )
 
-type reflectable[T familyMarker] struct {
-}
-
-// ======================================== Directions
-
-func (reflectable[T]) Target() reflect.Type {
-	return reflect.TypeFor[T]()
-}
-
 // ======================================== Lane
 
 type LaneExplorationStrategy string
@@ -40,15 +31,52 @@ func isLaneField(t reflect.StructField) bool {
 
 // ======================================== Spot
 
-type Spot[M familyMarker] struct {
-	reflectable[M]
+// SingleSpot describes exactly one occurrence of M, a non-pointer marker struct.
+type SingleSpot[M familyMarker] struct {
+	Subject M
 }
 
-func (Spot[M]) spot() {}
+// OptionalSpot describes zero or one occurrence of M. Subject is nil when absent;
+// M itself must be a non-pointer marker struct.
+type OptionalSpot[M familyMarker] struct {
+	Subject *M
+}
+
+// MultiSpot describes occurrences of M, a non-pointer marker struct. Its field
+// requires multiplicity:"any" for zero or more, or "some" for one or more.
+type MultiSpot[M familyMarker] struct {
+	Subject []M
+}
+
+type spotKind string
+
+const (
+	singleSpot   spotKind = "single"
+	optionalSpot spotKind = "optional"
+	multiSpot    spotKind = "multi"
+)
+
+// spotShape keeps the target tied to the type held by Subject. Its sealed
+// provider is promoted by composite declarations without a public Target hook.
+type spotShape struct {
+	kind   spotKind
+	target reflect.Type
+}
+
+func (SingleSpot[M]) spot() spotShape {
+	return spotShape{kind: singleSpot, target: reflect.TypeFor[M]()}
+}
+
+func (OptionalSpot[M]) spot() spotShape {
+	return spotShape{kind: optionalSpot, target: reflect.TypeFor[M]()}
+}
+
+func (MultiSpot[M]) spot() spotShape {
+	return spotShape{kind: multiSpot, target: reflect.TypeFor[M]()}
+}
 
 type spotDeclaration interface {
-	spot()
-	Target() reflect.Type
+	spot() spotShape
 }
 
 func isSpotField(t reflect.StructField) bool {
@@ -68,7 +96,7 @@ type MarkerDeclaration interface {
 }
 
 // Hook requirements belong to API boundaries, independently of role recognition.
-type chart interface {
+type chart interface { // legend
 	chartDeclaration
 	MarkProvider
 }

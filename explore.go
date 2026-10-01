@@ -23,11 +23,12 @@ type Codex struct {
 type lane struct {
 	schemaField []int
 	strategy    LaneExplorationStrategy
-	spots       []spot
+	spots       []spot // Alternatives within the lane; their order is not policy.
 }
 
 type spot struct {
 	schemaField []int
+	kind        spotKind
 	cardinality cardinality
 	target      *location
 }
@@ -230,34 +231,36 @@ func (c *explorer) collectSpots(t reflect.Type) ([]spot, error) {
 		}
 		role := tag.Parts[0]
 		if !field.IsExported() || role != "spot" || !isSpotField(field) {
-			return nil, fmt.Errorf("%v.%s: expected an exported sail.Spot declaration", t, field.Name)
-		}
-		value, err := readSingleTag(field.Tag, "cardinality", nil)
-		if err != nil {
-			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
-		}
-		cardinality, err := compileCardinality(value)
-		if err != nil {
-			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
+			return nil, fmt.Errorf("%v.%s: expected an exported SingleSpot, OptionalSpot, or MultiSpot declaration", t, field.Name)
 		}
 		spotType := utilities.ResolvePointerChain(field.Type)
 		if spotType == nil || spotType.Kind() != reflect.Struct {
 			return nil, fmt.Errorf("%v.%s: spot must resolve to a struct", t, field.Name)
 		}
 		surrogate := reflect.New(spotType).Interface().(spotDeclaration)
-		targetType, err := utilities.InvokeDeclaration(spotType, "Target", surrogate.Target)
+		shape, err := utilities.InvokeDeclaration(spotType, "spot", surrogate.spot)
 		if err != nil {
 			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
 		}
-		if utilities.TypeImplements[chartDeclaration](utilities.ResolvePointerChain(targetType)) {
+		// Validate M before normalization: pointer markers are not declaration
+		// policy. OptionalSpot owns the pointer used to represent absence.
+		if shape.target == nil || shape.target.Kind() != reflect.Struct {
+			return nil, fmt.Errorf("%v.%s: spot target %v must be a non-pointer marker struct", t, field.Name, shape.target)
+		}
+		cardinality, err := compileCardinality(shape.kind, field.Tag)
+		if err != nil {
+			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
+		}
+		if utilities.TypeImplements[chartDeclaration](shape.target) {
 			return nil, fmt.Errorf("%v.%s: spot must target a region or landmark, not a chart", t, field.Name)
 		}
-		targetLocation, err := c.explore(targetType)
+		targetLocation, err := c.explore(shape.target)
 		if err != nil {
 			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
 		}
 		result = append(result, spot{
 			schemaField: append([]int(nil), field.Index...),
+			kind:        shape.kind,
 			cardinality: cardinality,
 			target:      targetLocation,
 		})
@@ -282,8 +285,8 @@ func recognizeDeclarationRole(t reflect.Type) (locationRole, error) {
 	return roles[0], nil
 }
 
-// Required hooks are checked before allocating a surrogate. Spot.Target may
-// be overridden, so reflected targets need validation beyond generic constraints.
+// Required hooks are checked before allocating a surrogate, independently of
+// marker role recognition.
 func validateMarkProvider(t reflect.Type, role locationRole) error {
 	if role == chartRole {
 		if !utilities.TypeImplements[MarkProvider](t) {
