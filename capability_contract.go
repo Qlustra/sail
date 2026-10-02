@@ -5,18 +5,18 @@ import (
 	"reflect"
 )
 
-// A quality contract retains the interface as a signature template. Subjects
+// A capability contract retains the interface as a signature template. Subjects
 // need not implement that literal interface when it contains Self.
-type qualityContract struct {
+type capabilityContract struct {
 	typ       reflect.Type
 	methods   []reflect.Method
 	templated bool
 }
 
-func compileQualityContract(typ reflect.Type) (qualityContract, error) {
-	contract := qualityContract{typ: typ}
+func compileCapabilityContract(typ reflect.Type) (capabilityContract, error) {
+	contract := capabilityContract{typ: typ}
 	if typ.Kind() != reflect.Interface {
-		return contract, fmt.Errorf("quality capability %v must be an interface", typ)
+		return contract, fmt.Errorf("capability %v must be an interface", typ)
 	}
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
@@ -34,7 +34,7 @@ func compileQualityContract(typ reflect.Type) (qualityContract, error) {
 	if contract.templated {
 		for _, method := range contract.methods {
 			if !method.IsExported() {
-				return contract, fmt.Errorf("quality capability %v uses Self: method %s must be exported", typ, method.Name)
+				return contract, fmt.Errorf("capability %v uses Self: method %s must be exported", typ, method.Name)
 			}
 		}
 	}
@@ -89,7 +89,7 @@ func containsSelf(typ reflect.Type, seen map[reflect.Type]bool) bool {
 	return false
 }
 
-func (c qualityContract) match(subject reflect.Type) error {
+func (c capabilityContract) match(subject reflect.Type) error {
 	receiver := reflect.PointerTo(subject)
 	if !c.templated {
 		if !receiver.Implements(c.typ) {
@@ -102,14 +102,14 @@ func (c qualityContract) match(subject reflect.Type) error {
 		if !exists {
 			return fmt.Errorf("%v requires capability %v: missing method %s", subject, c.typ, expected.Name)
 		}
-		if !matchesQualitySignature(actual.Type, expected.Type, subject) {
+		if !matchesCapabilitySignature(actual.Type, expected.Type, subject) {
 			return fmt.Errorf("%v.%s has signature %v, expected %v with Self = %v", subject, expected.Name, actual.Type, expected.Type, subject)
 		}
 	}
 	return nil
 }
 
-func matchesQualitySignature(actual, expected, subject reflect.Type) bool {
+func matchesCapabilitySignature(actual, expected, subject reflect.Type) bool {
 	// Concrete methods include their receiver; interface methods do not.
 	if actual.NumIn() != expected.NumIn()+1 || actual.NumOut() != expected.NumOut() || actual.IsVariadic() != expected.IsVariadic() {
 		return false

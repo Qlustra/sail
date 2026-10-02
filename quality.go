@@ -2,13 +2,6 @@ package sail
 
 import "reflect"
 
-// Self is a signature placeholder for a quality's receiving subject type.
-// Population resolves subject pointers before matching Self, retaining the
-// identity of the defined type. Self may appear directly as a capability
-// method's parameter or result; compound types containing Self are unsupported.
-// It is a contract placeholder, never the quality's stored value type.
-type Self struct{}
-
 // Quality stores a capability result required by its owning qualifier. Declare
 // it inside a qualifier composite with sail:"quality" and populate:"Method".
 // An absent qualifier leaves its qualities inactive; a present qualifier

@@ -120,6 +120,39 @@ subject and qualifier context. `Present()` distinguishes an inactive quality
 from a successful zero or nil result. Reading a quality never invokes or
 validates its value. Live-value parsing and validation remain separate.
 
+## Declaration utilities
+
+`ResolvePointerChain(typ)` follows pointer types without erasing the identity of
+the resulting defined type. Nil input or a pointer cycle returns nil. An
+interface remains an interface; a declaration alone cannot resolve its concrete
+implementation.
+
+`ReadCapability[V, I](typ, method)` reads a declaration capability without a
+chart or qualifier. It uses the same contract matching and invocation machinery
+as qualities:
+
+```go
+value, present, err := sail.ReadCapability[any, Defaultable[sail.Self]](
+	reflect.TypeFor[Remote](), "Default",
+)
+```
+
+I must be an interface. Its selected method must be exported, take no arguments,
+and return one value assignable to V. Self follows the same direct-signature
+rules as qualities. In this example, `value` contains a `Remote`, preserving its
+dynamic type.
+
+An unavailable or incompatible capability returns `present == false` without
+an error. This includes nil, cyclic pointer, and interface subject types that
+cannot supply a surrogate. Invalid capability requests, incompatible storage,
+and hook panics return errors. A successful zero or nil result still returns
+`present == true`.
+
+Every call constructs a fresh zero-valued surrogate and invokes independently;
+it does not access a live subject or cache results. The caller decides whether
+to request a capability and how to use its result. Qualities instead retain
+their compiled reader in the schema and require presence when activated.
+
 ## Lane policies
 
 Lanes form ordered bands in a subject's declaration. Spots are unordered
