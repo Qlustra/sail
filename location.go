@@ -22,7 +22,7 @@ type location struct {
 	typ          reflect.Type
 	role         locationRole
 	mark         mark
-	acceptance   Acceptance
+	acceptance   acceptance
 	qualifiers   []qualifier
 	features     []feature
 	barrels      []barrel

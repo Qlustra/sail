@@ -90,7 +90,12 @@ func containsSelf(typ reflect.Type, seen map[reflect.Type]bool) bool {
 }
 
 func (c capabilityContract) match(subject reflect.Type) error {
-	receiver := reflect.PointerTo(subject)
+	receiver := subject
+	receiverInputs := 0
+	if subject.Kind() != reflect.Interface {
+		receiver = reflect.PointerTo(subject)
+		receiverInputs = 1
+	}
 	if !c.templated {
 		if !receiver.Implements(c.typ) {
 			return fmt.Errorf("%v requires capability %v", subject, c.typ)
@@ -102,20 +107,20 @@ func (c capabilityContract) match(subject reflect.Type) error {
 		if !exists {
 			return fmt.Errorf("%v requires capability %v: missing method %s", subject, c.typ, expected.Name)
 		}
-		if !matchesCapabilitySignature(actual.Type, expected.Type, subject) {
+		if !matchesCapabilitySignature(actual.Type, expected.Type, subject, receiverInputs) {
 			return fmt.Errorf("%v.%s has signature %v, expected %v with Self = %v", subject, expected.Name, actual.Type, expected.Type, subject)
 		}
 	}
 	return nil
 }
 
-func matchesCapabilitySignature(actual, expected, subject reflect.Type) bool {
+func matchesCapabilitySignature(actual, expected, subject reflect.Type, receiverInputs int) bool {
 	// Concrete methods include their receiver; interface methods do not.
-	if actual.NumIn() != expected.NumIn()+1 || actual.NumOut() != expected.NumOut() || actual.IsVariadic() != expected.IsVariadic() {
+	if actual.NumIn() != expected.NumIn()+receiverInputs || actual.NumOut() != expected.NumOut() || actual.IsVariadic() != expected.IsVariadic() {
 		return false
 	}
 	for i := 0; i < expected.NumIn(); i++ {
-		if actual.In(i+1) != resolveSelf(expected.In(i), subject) {
+		if actual.In(i+receiverInputs) != resolveSelf(expected.In(i), subject) {
 			return false
 		}
 	}

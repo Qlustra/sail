@@ -33,19 +33,36 @@ A marker can constrain its receiving type with an optional declaration hook:
 
 ```go
 func (EnumOptionLandmark) Accept() sail.Acceptance {
-	return sail.Exact[bool]()
+	return sail.AcceptExact[bool]()
 }
 ```
 
 Exploration invokes `Accept` once per location on its zero-valued surrogate and
-records the returned rule. Returning an empty `sail.Acceptance` or panicking in
-the hook fails exploration. Without the hook, existing role requirements apply.
+compiles the returned rule. Returning an empty `sail.Acceptance`, an invalid
+kind or contract, or panicking in the hook fails exploration. The declaration
+builders do not panic on invalid input. Without the hook, existing role
+requirements apply.
 
-Population checks the original declared subject type before filling that
-occurrence's metadata, descending, or invoking its capabilities. Exact matching
-accepts aliases of T, but not distinct defined types or pointers to T. Interface
-types also match by identity: `Exact[any]()` requires a field declared `any`.
-Charts and regions must still resolve to structs.
+Each declaration selects one rule:
+
+- `AcceptExact[T]()` compares the original declared type. Aliases of T pass;
+  distinct defined types and pointers to T do not. Interface types also match
+  by identity: `AcceptExact[any]()` requires a field declared `any`.
+- `AcceptKind(reflect.String)` compares the original declared kind. Defined
+  string types pass; pointers do not. Collection kinds impose no element
+  constraints. `reflect.Invalid` and unknown kinds are invalid declarations.
+- `AcceptContract[I]()` requires an interface contract, using the same signature
+  matching as qualities. Pointer chains resolve to a receiving type T, preserving
+  defined-type identity. Concrete types support methods on T or *T; interface
+  declarations use their own method set. Direct `Self` parameters and results
+  resolve to T, including when T is an interface. No surrogate is constructed
+  and no subject method is invoked. Non-interface contracts and unsupported
+  `Self` signatures fail exploration. Barrels and qualities still require
+  concrete receivers for invocation.
+
+Population checks acceptance before filling that occurrence's metadata,
+descending, or invoking its capabilities. Charts and regions must still resolve
+to structs. Rule combinations and collection element constraints are not defined.
 
 Marks and lanes select the occurrence first. An acceptance mismatch fails with
 the subject path, marker, expected type, and actual type; it does not retry
