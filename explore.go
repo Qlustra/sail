@@ -113,9 +113,6 @@ func (c *explorer) explore(t reflect.Type) (*location, error) {
 	if err := location.collectMark(c.tag, surrogate); err != nil {
 		return nil, err
 	}
-	if err := location.collectBehavior(surrogate); err != nil {
-		return nil, err
-	}
 	if role == chartRole {
 		c.tag = location.mark.tag
 	}
@@ -159,6 +156,10 @@ func (c *explorer) inspectDeclaration(location *location) ([]laneField, error) {
 			}
 		case "qualifier":
 			if err := location.collectQualifier(field, qualifiers); err != nil {
+				return nil, err
+			}
+		case "barrel":
+			if err := location.collectBarrel(field); err != nil {
 				return nil, err
 			}
 		case "lane":

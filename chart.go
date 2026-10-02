@@ -235,37 +235,3 @@ func (f *Feature) Set(value string) {
 type FeatureDeclaration interface {
 	Symbol() string
 }
-
-// ======================================== Capability
-
-type Behavior []MarkerCapability
-
-type MarkerCapability struct {
-	typ reflect.Type
-}
-
-func (c MarkerCapability) Matches(t reflect.Type) bool {
-	if t.Implements(c.typ) {
-		return true
-	}
-
-	if t.Kind() != reflect.Pointer {
-		return reflect.PointerTo(t).Implements(c.typ)
-	}
-
-	return false
-}
-
-// Capability records a type without validating it. Exploration requires every
-// declared behavior capability to describe an interface.
-func Capability[I any]() MarkerCapability {
-	return MarkerCapability{typ: reflect.TypeFor[I]()}
-}
-
-// BehaviorProvider describes a declaration's capabilities. Behavior must work
-// on a newly allocated zero-valued declaration without prior initialization.
-type BehaviorProvider interface {
-	Behavior() Behavior
-}
-
-var behaviorProviderType = reflect.TypeOf((*BehaviorProvider)(nil)).Elem()

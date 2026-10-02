@@ -8,7 +8,8 @@ import (
 )
 
 // Populate allocates a chart to describe S's static declaration using an
-// explored world. It does not construct or modify a subject instance.
+// explored world. It requires no live subject. Barrel capabilities run on fresh
+// zero-valued subject-type surrogates and must not depend on application state.
 func Populate[S any, C chart](world *World[C]) (*C, error) {
 	c := new(C)
 
@@ -55,9 +56,18 @@ func (p *populator) populate(location *location, value reflect.Value, source sub
 	if err := location.populateMetadata(value, source, tags, qualifiers); err != nil {
 		return fmt.Errorf("%s as %v: %w", source, location.typ, err)
 	}
-	if location.role == landmarkRole {
-		return nil
+	if location.role != landmarkRole {
+		if err := p.populateLanes(location, value, source); err != nil {
+			return err
+		}
 	}
+	if err := location.populateBarrels(value, source.typ); err != nil {
+		return fmt.Errorf("%s: %w", source, err)
+	}
+	return nil
+}
+
+func (p *populator) populateLanes(location *location, value reflect.Value, source subjectReference) error {
 	subject := utilities.ResolvePointerChain(source.typ)
 	if subject == nil || subject.Kind() != reflect.Struct {
 		return fmt.Errorf("%s: %v requires a subject declaration that resolves to a struct, got %v", source, location.typ, source.typ)

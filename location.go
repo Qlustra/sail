@@ -24,8 +24,8 @@ type location struct {
 	mark         mark
 	qualifiers   []qualifier
 	features     []feature
+	barrels      []barrel
 	lanes        []lane
-	behavior     Behavior
 	carrierField []int
 }
 
@@ -40,7 +40,7 @@ type qualifier struct {
 }
 
 // newLocation starts a local description; the explorer records it only after
-// its fields, mark, and behavior have passed validation.
+// its fields and mark have passed validation.
 func newLocation(t reflect.Type, role locationRole) (*location, error) {
 	var carrier reflect.Type
 	switch role {
@@ -127,22 +127,6 @@ func (l *location) collectQualifier(field reflect.StructField, seen map[string]b
 	}
 	seen[symbol] = true
 	l.qualifiers = append(l.qualifiers, qualifier{symbol: symbol, schemaField: slices.Concat(field.Index, path)})
-	return nil
-}
-
-func (l *location) collectBehavior(surrogate any) error {
-	if provider, ok := surrogate.(BehaviorProvider); ok {
-		behavior, err := utilities.InvokeDeclaration(l.typ, "Behavior", provider.Behavior)
-		if err != nil {
-			return err
-		}
-		l.behavior = append(Behavior(nil), behavior...)
-		for _, capability := range l.behavior {
-			if capability.typ == nil || capability.typ.Kind() != reflect.Interface {
-				return fmt.Errorf("%v: behavior capability must describe an interface", l.typ)
-			}
-		}
-	}
 	return nil
 }
 
