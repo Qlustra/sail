@@ -27,6 +27,31 @@ multi spots hold a slice. Repeated subject types are populated independently.
 An active cycle of the same marker and subject types is rejected because it
 would require an infinite expansion. Live subject binding remains separate.
 
+## Acceptance
+
+A marker can constrain its receiving type with an optional declaration hook:
+
+```go
+func (EnumOptionLandmark) Accept() sail.Acceptance {
+	return sail.Exact[bool]()
+}
+```
+
+Exploration invokes `Accept` once per location on its zero-valued surrogate and
+records the returned rule. Returning an empty `sail.Acceptance` or panicking in
+the hook fails exploration. Without the hook, existing role requirements apply.
+
+Population checks the original declared subject type before filling that
+occurrence's metadata, descending, or invoking its capabilities. Exact matching
+accepts aliases of T, but not distinct defined types or pointers to T. Interface
+types also match by identity: `Exact[any]()` requires a field declared `any`.
+Charts and regions must still resolve to structs.
+
+Marks and lanes select the occurrence first. An acceptance mismatch fails with
+the subject path, marker, expected type, and actual type; it does not retry
+another spot or advance the lane. Only selected occurrences are checked;
+untagged fields remain outside population.
+
 ## Barrels
 
 A barrel declares a capability, selects a method, and stores its result during

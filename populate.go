@@ -54,6 +54,9 @@ type populator struct {
 }
 
 func (p *populator) populate(location *location, value reflect.Value, source subjectReference, tags reflect.StructTag, qualifiers []string) error {
+	if err := location.acceptance.match(source.typ); err != nil {
+		return fmt.Errorf("%s as %v (%s): %w", source, location.typ, location.mark, err)
+	}
 	if err := location.populateMetadata(value, source, tags, qualifiers); err != nil {
 		return fmt.Errorf("%s as %v: %w", source, location.typ, err)
 	}

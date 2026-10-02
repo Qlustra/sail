@@ -22,6 +22,7 @@ type location struct {
 	typ          reflect.Type
 	role         locationRole
 	mark         mark
+	acceptance   Acceptance
 	qualifiers   []qualifier
 	features     []feature
 	barrels      []barrel
@@ -35,7 +36,7 @@ type feature struct {
 }
 
 // newLocation starts a local description; the explorer records it only after
-// its fields and mark have passed validation.
+// its fields, mark, and acceptance have passed validation.
 func newLocation(t reflect.Type, role locationRole) (*location, error) {
 	var carrier reflect.Type
 	switch role {

@@ -113,6 +113,9 @@ func (c *explorer) explore(t reflect.Type) (*location, error) {
 	if err := location.collectMark(c.tag, surrogate); err != nil {
 		return nil, err
 	}
+	if err := location.collectAcceptance(surrogate); err != nil {
+		return nil, err
+	}
 	if role == chartRole {
 		c.tag = location.mark.tag
 	}
