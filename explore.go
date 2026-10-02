@@ -3,6 +3,7 @@ package sail
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/qlustra/sail/internals/utilities"
 )
@@ -21,10 +22,11 @@ type Codex struct {
 }
 
 type spot struct {
-	schemaField []int
-	kind        spotKind
-	cardinality cardinality
-	target      *location
+	schemaField  []int
+	subjectField []int // Path inside the spot declaration to its carrier's Subject.
+	kind         spotKind
+	cardinality  cardinality
+	target       *location
 }
 
 // ======================================== Exploration
@@ -98,7 +100,10 @@ func (c *explorer) explore(t reflect.Type) (*location, error) {
 		return nil, err
 	}
 
-	location := newLocation(t, role)
+	location, err := newLocation(t, role)
+	if err != nil {
+		return nil, err
+	}
 	lanes, err := c.inspectDeclaration(location)
 	if err != nil {
 		return nil, err
@@ -218,6 +223,12 @@ func (c *explorer) collectSpots(t reflect.Type) ([]spot, error) {
 		if shape.target == nil || shape.target.Kind() != reflect.Struct {
 			return nil, fmt.Errorf("%v.%s: spot target %v must be a non-pointer marker struct", t, field.Name, shape.target)
 		}
+		carrierField, err := carrierPath(spotType, shape.carrier)
+		if err != nil {
+			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
+		}
+		// Look up Subject on the sealed carrier, never on a composite wrapper.
+		subjectField, _ := shape.carrier.FieldByName("Subject")
 		cardinality, err := compileCardinality(shape.kind, field.Tag)
 		if err != nil {
 			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
@@ -230,10 +241,11 @@ func (c *explorer) collectSpots(t reflect.Type) ([]spot, error) {
 			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
 		}
 		result = append(result, spot{
-			schemaField: append([]int(nil), field.Index...),
-			kind:        shape.kind,
-			cardinality: cardinality,
-			target:      targetLocation,
+			schemaField:  append([]int(nil), field.Index...),
+			subjectField: slices.Concat(carrierField, subjectField.Index),
+			kind:         shape.kind,
+			cardinality:  cardinality,
+			target:       targetLocation,
 		})
 	}
 	return result, nil

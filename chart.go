@@ -61,20 +61,21 @@ const (
 // spotShape keeps the target tied to the type held by Subject. Its sealed
 // provider is promoted by composite declarations without a public Target hook.
 type spotShape struct {
-	kind   spotKind
-	target reflect.Type
+	kind    spotKind
+	target  reflect.Type
+	carrier reflect.Type
 }
 
 func (SingleSpot[M]) spot() spotShape {
-	return spotShape{kind: singleSpot, target: reflect.TypeFor[M]()}
+	return spotShape{kind: singleSpot, target: reflect.TypeFor[M](), carrier: reflect.TypeFor[SingleSpot[M]]()}
 }
 
 func (OptionalSpot[M]) spot() spotShape {
-	return spotShape{kind: optionalSpot, target: reflect.TypeFor[M]()}
+	return spotShape{kind: optionalSpot, target: reflect.TypeFor[M](), carrier: reflect.TypeFor[OptionalSpot[M]]()}
 }
 
 func (MultiSpot[M]) spot() spotShape {
-	return spotShape{kind: multiSpot, target: reflect.TypeFor[M]()}
+	return spotShape{kind: multiSpot, target: reflect.TypeFor[M](), carrier: reflect.TypeFor[MultiSpot[M]]()}
 }
 
 type spotDeclaration interface {
@@ -88,7 +89,10 @@ func isSpotField(t reflect.StructField) bool {
 // ======================================== Marker
 
 type marker struct {
+	source subjectReference
 }
+
+func (m *marker) setSource(source subjectReference) { m.source = source }
 
 // The method name must differ from the embedded marker field to be promoted.
 func (marker) isMarker() {}

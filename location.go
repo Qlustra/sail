@@ -3,6 +3,7 @@ package sail
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/qlustra/sail/internals/utilities"
 )
@@ -18,13 +19,14 @@ const (
 // A location describes a reusable schema type. Lanes and spots describe
 // occurrences within it; none of these descriptors hold live subject values.
 type location struct {
-	typ        reflect.Type
-	role       locationRole
-	mark       mark
-	qualifiers []qualifier
-	features   []feature
-	lanes      []lane
-	behavior   Behavior
+	typ          reflect.Type
+	role         locationRole
+	mark         mark
+	qualifiers   []qualifier
+	features     []feature
+	lanes        []lane
+	behavior     Behavior
+	carrierField []int
 }
 
 type feature struct {
@@ -39,8 +41,21 @@ type qualifier struct {
 
 // newLocation starts a local description; the explorer records it only after
 // its fields, mark, and behavior have passed validation.
-func newLocation(t reflect.Type, role locationRole) *location {
-	return &location{typ: t, role: role}
+func newLocation(t reflect.Type, role locationRole) (*location, error) {
+	var carrier reflect.Type
+	switch role {
+	case chartRole:
+		carrier = reflect.TypeFor[Chart]()
+	case regionRole:
+		carrier = reflect.TypeFor[Region]()
+	case landmarkRole:
+		carrier = reflect.TypeFor[Landmark]()
+	}
+	path, err := carrierPath(t, carrier)
+	if err != nil {
+		return nil, err
+	}
+	return &location{typ: t, role: role, carrierField: path}, nil
 }
 
 func (l *location) collectMark(tag string, surrogate any) error {
@@ -86,8 +101,12 @@ func (l *location) collectFeature(field reflect.StructField, seen map[string]boo
 	if seen[symbol] {
 		return fmt.Errorf("%v.%s: duplicate symbol %q", l.typ, field.Name, symbol)
 	}
+	path, err := carrierPath(field.Type, reflect.TypeFor[Feature]())
+	if err != nil {
+		return fmt.Errorf("%v.%s: %w", l.typ, field.Name, err)
+	}
 	seen[symbol] = true
-	l.features = append(l.features, feature{symbol: symbol, schemaField: append([]int(nil), field.Index...)})
+	l.features = append(l.features, feature{symbol: symbol, schemaField: slices.Concat(field.Index, path)})
 	return nil
 }
 
@@ -102,8 +121,12 @@ func (l *location) collectQualifier(field reflect.StructField, seen map[string]b
 	if seen[symbol] {
 		return fmt.Errorf("%v.%s: duplicate symbol %q", l.typ, field.Name, symbol)
 	}
+	path, err := carrierPath(field.Type, reflect.TypeFor[Qualifier]())
+	if err != nil {
+		return fmt.Errorf("%v.%s: %w", l.typ, field.Name, err)
+	}
 	seen[symbol] = true
-	l.qualifiers = append(l.qualifiers, qualifier{symbol: symbol, schemaField: append([]int(nil), field.Index...)})
+	l.qualifiers = append(l.qualifiers, qualifier{symbol: symbol, schemaField: slices.Concat(field.Index, path)})
 	return nil
 }
 
