@@ -4,14 +4,13 @@ Sail
 ## Lane policies
 
 Lanes form ordered bands in a subject's declaration. Spots are unordered
-alternatives within a lane. The `exploration` tag declares how population
-should choose between lanes that accept the current field:
+alternatives within a lane. The `exploration` tag declares how fields are
+assigned to lanes:
 
 | Policy | Meaning |
 | --- | --- |
-| `eager` | Prefer the current lane while it accepts the field. |
-| `curious` | Prefer a reachable subsequent lane that also accepts the field. |
-| `unambiguous` | Require the declaration to determine placement without a preference. |
+| `eager` | Stay in the current lane while it accepts the field. |
+| `unambiguous` | Reject structural overlap between reachable lanes during exploration. |
 
 Omitting `exploration` selects `unambiguous`.
 

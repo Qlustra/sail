@@ -62,7 +62,7 @@ func readLaneStrategy(tags reflect.StructTag) (LaneExplorationStrategy, error) {
 	}
 	strategy := LaneExplorationStrategy(format.Raw)
 	switch strategy {
-	case ExploreEagerly, ExploreCuriously, ExploreUnambiguously:
+	case ExploreEagerly, ExploreUnambiguously:
 		return strategy, nil
 	default:
 		return "", fmt.Errorf("invalid exploration strategy %q", format.Raw)
