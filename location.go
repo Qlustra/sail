@@ -34,11 +34,6 @@ type feature struct {
 	schemaField []int
 }
 
-type qualifier struct {
-	symbol      string
-	schemaField []int
-}
-
 // newLocation starts a local description; the explorer records it only after
 // its fields and mark have passed validation.
 func newLocation(t reflect.Type, role locationRole) (*location, error) {
@@ -107,26 +102,6 @@ func (l *location) collectFeature(field reflect.StructField, seen map[string]boo
 	}
 	seen[symbol] = true
 	l.features = append(l.features, feature{symbol: symbol, schemaField: slices.Concat(field.Index, path)})
-	return nil
-}
-
-func (l *location) collectQualifier(field reflect.StructField, seen map[string]bool) error {
-	if !utilities.FieldImplements[qualifierDeclaration](field) {
-		return fmt.Errorf("%v.%s: qualifier must embed sail.Qualifier", l.typ, field.Name)
-	}
-	symbol, err := readSingleTag(field.Tag, "symbol", validateSymbol)
-	if err != nil {
-		return fmt.Errorf("%v.%s: %w", l.typ, field.Name, err)
-	}
-	if seen[symbol] {
-		return fmt.Errorf("%v.%s: duplicate symbol %q", l.typ, field.Name, symbol)
-	}
-	path, err := carrierPath(field.Type, reflect.TypeFor[Qualifier]())
-	if err != nil {
-		return fmt.Errorf("%v.%s: %w", l.typ, field.Name, err)
-	}
-	seen[symbol] = true
-	l.qualifiers = append(l.qualifiers, qualifier{symbol: symbol, schemaField: slices.Concat(field.Index, path)})
 	return nil
 }
 

@@ -66,6 +66,60 @@ an absent capability from a successful call returning `""`, zero, or nil. Neithe
 accessor invokes hooks or validates values. No separate behavior registration or
 population hook is required.
 
+## Qualities
+
+A qualifier composite can declare capabilities required when its symbol is
+present on a subject occurrence:
+
+```go
+type Defaultable[T any] interface {
+	Default() T
+}
+
+type DefaultQualifier struct {
+	sail.Qualifier
+	Value sail.Quality[any, Defaultable[sail.Self]] `sail:"quality" populate:"Default"`
+}
+
+type Argument struct {
+	sail.Landmark
+	Default DefaultQualifier `sail:"qualifier" symbol:"default"`
+}
+
+func (Argument) Family() string { return "arg" }
+
+type Remote string
+
+func (Remote) Default() Remote { return "origin" }
+```
+
+For a subject field `Remote Remote` marked with `arg,default`, population
+requires and invokes `Default() Remote`. Without the qualifier, the quality
+stays inactive: no capability is required or invoked. This association comes
+from nesting, not from the symbol's meaning. Reusable qualifier wrappers retain
+the qualities declared along their embedded `Qualifier` path.
+
+`Self` matches the receiving type after pointer normalization, preserving
+defined-type identity. It is a signature placeholder, not a Go interface that
+the subject must literally implement. Sail checks the entire capability's
+method set. This slice supports Self directly in method parameters and results;
+compound uses such as `[]Self` and `*Self` fail exploration. Interfaces using
+Self must have exported methods. Ordinary interfaces use Go's implementation
+rules, including private methods.
+
+The selected `populate` method must be exported, take no arguments, and return
+one value. Fixed result types are checked for assignability to the storage type
+during exploration; Self results are checked during population. Self cannot be
+used as the storage type. With `any`, `arg.Default.Value.Get()` returns an
+interface containing the actual `Remote` value, not a converted string.
+
+Each active quality invokes its method on a fresh zero-valued surrogate, after
+the occurrence's fields and child lanes are populated. Missing or mismatched
+capabilities, incompatible storage, and hook panics fail population with the
+subject and qualifier context. `Present()` distinguishes an inactive quality
+from a successful zero or nil result. Reading a quality never invokes or
+validates its value. Live-value parsing and validation remain separate.
+
 ## Lane policies
 
 Lanes form ordered bands in a subject's declaration. Spots are unordered

@@ -8,8 +8,9 @@ import (
 )
 
 // Populate allocates a chart to describe S's static declaration using an
-// explored world. It requires no live subject. Barrel capabilities run on fresh
-// zero-valued subject-type surrogates and must not depend on application state.
+// explored world. It requires no live subject. Barrel and quality capabilities
+// run on fresh zero-valued subject-type surrogates and must not depend on
+// application state.
 func Populate[S any, C chart](world *World[C]) (*C, error) {
 	c := new(C)
 
@@ -60,6 +61,9 @@ func (p *populator) populate(location *location, value reflect.Value, source sub
 		if err := p.populateLanes(location, value, source); err != nil {
 			return err
 		}
+	}
+	if err := location.populateQualities(value, source.typ, qualifiers); err != nil {
+		return fmt.Errorf("%s: %w", source, err)
 	}
 	if err := location.populateBarrels(value, source.typ); err != nil {
 		return fmt.Errorf("%s: %w", source, err)
