@@ -16,6 +16,8 @@ type subjectReference struct {
 	path []int
 }
 
+func (m marker) subjectReference() subjectReference { return m.source }
+
 // SubjectType returns the receiving type of this populated marker's occurrence.
 // It is nil on a declaration that has not been populated.
 func (m marker) SubjectType() reflect.Type { return m.source.typ }

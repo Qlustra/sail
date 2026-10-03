@@ -38,20 +38,23 @@ type feature struct {
 // newLocation starts a local description; the explorer records it only after
 // its fields, mark, and acceptance have passed validation.
 func newLocation(t reflect.Type, role locationRole) (*location, error) {
-	var carrier reflect.Type
-	switch role {
-	case chartRole:
-		carrier = reflect.TypeFor[Chart]()
-	case regionRole:
-		carrier = reflect.TypeFor[Region]()
-	case landmarkRole:
-		carrier = reflect.TypeFor[Landmark]()
-	}
-	path, err := carrierPath(t, carrier)
+	path, err := carrierPath(t, role.carrier())
 	if err != nil {
 		return nil, err
 	}
 	return &location{typ: t, role: role, carrierField: path}, nil
+}
+
+func (role locationRole) carrier() reflect.Type {
+	switch role {
+	case chartRole:
+		return reflect.TypeFor[Chart]()
+	case regionRole:
+		return reflect.TypeFor[Region]()
+	case landmarkRole:
+		return reflect.TypeFor[Landmark]()
+	}
+	return nil
 }
 
 func (l *location) collectMark(tag string, surrogate any) error {

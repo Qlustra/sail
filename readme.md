@@ -27,6 +27,43 @@ multi spots hold a slice. Repeated subject types are populated independently.
 An active cycle of the same marker and subject types is rejected because it
 would require an infinite expansion. Live subject binding remains separate.
 
+## Live binding
+
+`Bind[I](subject, occurrence)` resolves one populated marker against the live
+subject and returns an ordinary Go interface receiver:
+
+```go
+command := &chart.EntryPoint.MainCommand.Subject
+receiver, present, err := sail.Bind[Runnable](&program, command)
+if err != nil {
+	return err
+}
+if present {
+	return receiver.Run(ctx)
+}
+```
+
+The root must be a nonnil pointer leading to the exact recorded root type;
+additional pointer wrappers are allowed. Sail follows the stored field path
+without allocating subjects or constructing addressable copies. Addressable
+concrete fields bind through their address when it implements I, preserving the
+connection to their original storage even for value-receiver interfaces.
+
+Interface fields expose their current dynamic receiver. A stored non-pointer
+value follows normal Go value semantics; if only its pointer implements I, an
+addressability error is returned. Replacing a pointer or interface field requires
+rebinding to obtain the replacement. Nil maps and slices remain valid values.
+
+`present == false` without an error means that the existing receiver does not
+implement I. Wrong roots, unpopulated or nil markers, missing pointer/interface
+storage, inaccessible receivers, and receiver cycles produce contextual errors.
+I must be an interface; `Self` signature templates are not substituted into a
+runtime Go interface.
+
+Binding invokes no subject methods and does not traverse siblings or descendants.
+The caller owns invocation and its error handling. Course selection and cascading
+walking remain separate work.
+
 ## Acceptance
 
 A marker can constrain its receiving type with an optional declaration hook:
