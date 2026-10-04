@@ -7,108 +7,108 @@ import (
 	"github.com/qlustra/sail/internals/utilities"
 )
 
-// Populate allocates a chart to describe S's static declaration using an
-// explored world. It requires no live subject. Barrel and quality capabilities
-// run on fresh zero-valued subject-type surrogates and must not depend on
-// application state.
-func Populate[S any, C chart](world *World[C]) (*C, error) {
-	c := new(C)
+// Populate allocates a world using legend L's shape to describe A's declaration.
+// The chart supplies the explored descriptors; no live application is required.
+// Barrel and quality capabilities run on fresh zero-valued application-type
+// surrogates and must not depend on application state.
+func Populate[A any, L legend](chart *Chart[L]) (*L, error) {
+	world := new(L)
 
-	err := world.populate(
-		reflect.ValueOf(c).Elem(),
-		reflect.TypeFor[S](),
+	err := chart.populate(
+		reflect.ValueOf(world).Elem(),
+		reflect.TypeFor[A](),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
+	return world, nil
 }
 
-func (w *World[C]) populate(chart reflect.Value, subject reflect.Type) error {
-	if w == nil || w.Root == nil {
-		return fmt.Errorf("sail: populate requires an explored world")
+func (c *Chart[L]) populate(world reflect.Value, appType reflect.Type) error {
+	if c == nil || c.Root == nil {
+		return fmt.Errorf("sail: populate requires an explored chart")
 	}
 
-	chartType := utilities.ResolvePointerChain(chart.Type())
-	if chartType != w.Root.typ {
-		return fmt.Errorf("sail: populate chart %v does not match world root %v", chart.Type(), w.Root.typ)
+	legendType := utilities.ResolvePointerChain(world.Type())
+	if legendType != c.Root.typ {
+		return fmt.Errorf("sail: world type %v does not match chart root %v", world.Type(), c.Root.typ)
 	}
 
-	chart, err := allocateDeclaration(chart)
+	world, err := allocateDeclaration(world)
 	if err != nil {
 		return err
 	}
-	p := populator{families: w.families, active: make(map[populationKey]subjectReference)}
-	return p.populate(w.Root, chart, subjectReference{root: subject, typ: subject}, "", nil)
+	p := populator{families: c.families, active: make(map[populationKey]applicationReference)}
+	return p.populate(c.Root, world, applicationReference{root: appType, typ: appType}, "", nil)
 }
 
 type populationKey struct {
-	location *location
-	subject  reflect.Type
+	descriptor *markerDescriptor
+	appType    reflect.Type
 }
 
 type populator struct {
 	families markFamilies
-	active   map[populationKey]subjectReference
+	active   map[populationKey]applicationReference
 }
 
-func (p *populator) populate(location *location, value reflect.Value, source subjectReference, tags reflect.StructTag, qualifiers []string) error {
-	if err := location.acceptance.match(source.typ); err != nil {
-		return fmt.Errorf("%s as %v (%s): %w", source, location.typ, location.mark, err)
+func (p *populator) populate(descriptor *markerDescriptor, value reflect.Value, source applicationReference, tags reflect.StructTag, qualifiers []string) error {
+	if err := descriptor.acceptance.match(source.typ); err != nil {
+		return fmt.Errorf("%s as %v (%s): %w", source, descriptor.typ, descriptor.mark, err)
 	}
-	if err := location.populateMetadata(value, source, tags, qualifiers); err != nil {
-		return fmt.Errorf("%s as %v: %w", source, location.typ, err)
+	if err := descriptor.populateMetadata(value, source, tags, qualifiers); err != nil {
+		return fmt.Errorf("%s as %v: %w", source, descriptor.typ, err)
 	}
-	if location.role != landmarkRole {
-		if err := p.populateLanes(location, value, source); err != nil {
+	if descriptor.role != landmarkRole {
+		if err := p.populateLanes(descriptor, value, source); err != nil {
 			return err
 		}
 	}
-	if err := location.populateQualities(value, source.typ, qualifiers); err != nil {
+	if err := descriptor.populateQualities(value, source.typ, qualifiers); err != nil {
 		return fmt.Errorf("%s: %w", source, err)
 	}
-	if err := location.populateBarrels(value, source.typ); err != nil {
+	if err := descriptor.populateBarrels(value, source.typ); err != nil {
 		return fmt.Errorf("%s: %w", source, err)
 	}
 	return nil
 }
 
-func (p *populator) populateLanes(location *location, value reflect.Value, source subjectReference) error {
-	subject := utilities.ResolvePointerChain(source.typ)
-	if subject == nil || subject.Kind() != reflect.Struct {
-		return fmt.Errorf("%s: %v requires a subject declaration that resolves to a struct, got %v", source, location.typ, source.typ)
+func (p *populator) populateLanes(descriptor *markerDescriptor, value reflect.Value, source applicationReference) error {
+	appType := utilities.ResolvePointerChain(source.typ)
+	if appType == nil || appType.Kind() != reflect.Struct {
+		return fmt.Errorf("%s: %v requires an application declaration that resolves to a struct, got %v", source, descriptor.typ, source.typ)
 	}
-	key := populationKey{location: location, subject: subject}
+	key := populationKey{descriptor: descriptor, appType: appType}
 	if previous, exists := p.active[key]; exists {
-		return fmt.Errorf("%s: recursive population of %v against %v returns to %s", source, location.typ, subject, previous)
+		return fmt.Errorf("%s: recursive population of %v against %v returns to %s", source, descriptor.typ, appType, previous)
 	}
 	p.active[key] = source
 	defer delete(p.active, key)
 
-	lanes, err := newLanePopulation(location, value, p.families)
+	lanes, err := newLanePopulation(descriptor, value, p.families)
 	if err != nil {
 		return fmt.Errorf("%s: %w", source, err)
 	}
-	for i := 0; i < subject.NumField(); i++ {
-		field := subject.Field(i)
-		if _, marked := field.Tag.Lookup(location.mark.tag); !marked {
+	for i := 0; i < appType.NumField(); i++ {
+		field := appType.Field(i)
+		if _, marked := field.Tag.Lookup(descriptor.mark.tag); !marked {
 			continue
 		}
 		child := source.child(field)
 		if !field.IsExported() {
-			return fmt.Errorf("%s: marked subject field must be exported", child)
+			return fmt.Errorf("%s: marked application field must be exported", child)
 		}
 		selected, err := lanes.selectField(field)
 		if err != nil {
 			return fmt.Errorf("%s: %w", child, err)
 		}
 		target := selected.candidate.target
-		occurrence := reflect.New(target.typ).Elem()
-		if err := p.populate(target, occurrence, child, field.Tag, selected.qualifiers); err != nil {
+		marker := reflect.New(target.typ).Elem()
+		if err := p.populate(target, marker, child, field.Tag, selected.qualifiers); err != nil {
 			return err
 		}
-		lanes.store(selected.candidate.spotIndex, occurrence)
+		lanes.store(selected.candidate.spotIndex, marker)
 	}
 	if err := lanes.finish(); err != nil {
 		return fmt.Errorf("%s: %w", source, err)

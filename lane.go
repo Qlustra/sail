@@ -7,14 +7,14 @@ import (
 	"github.com/qlustra/sail/internals/utilities"
 )
 
-type lane struct {
-	schemaField []int
-	strategy    LaneExplorationStrategy
-	spots       []spot // Alternatives within the lane; their order is not policy.
+type laneDescriptor struct {
+	declarationPath []int
+	strategy        LaneExplorationStrategy
+	spots           []spotDescriptor // Alternatives within the lane; their order is not policy.
 }
 
 // nullable reports whether the lane can be skipped without any occurrences.
-func (l lane) nullable() bool {
+func (l laneDescriptor) nullable() bool {
 	for _, spot := range l.spots {
 		if spot.cardinality.min > 0 {
 			return false
@@ -25,10 +25,10 @@ func (l lane) nullable() bool {
 
 // laneField retains the local inspection needed for later lane expansion.
 type laneField struct {
-	name        string
-	typ         reflect.Type
-	schemaField []int
-	strategy    LaneExplorationStrategy
+	name            string
+	typ             reflect.Type
+	declarationPath []int
+	strategy        LaneExplorationStrategy
 }
 
 func inspectLane(field reflect.StructField) (laneField, error) {
@@ -44,10 +44,10 @@ func inspectLane(field reflect.StructField) (laneField, error) {
 		return laneField{}, err
 	}
 	return laneField{
-		name:        field.Name,
-		typ:         typ,
-		schemaField: append([]int(nil), field.Index...),
-		strategy:    strategy,
+		name:            field.Name,
+		typ:             typ,
+		declarationPath: append([]int(nil), field.Index...),
+		strategy:        strategy,
 	}, nil
 }
 

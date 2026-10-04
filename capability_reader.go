@@ -8,7 +8,7 @@ import (
 )
 
 // A reader compiles one declaration method and its destination type. Qualities
-// retain it in the schema; ReadCapability compiles it for an individual call.
+// retain it in their descriptors; ReadCapability compiles it for an individual call.
 type capabilityReader struct {
 	value    reflect.Type
 	contract capabilityContract
@@ -21,7 +21,7 @@ func compileCapabilityReader(value, capability reflect.Type, name string) (capab
 		return capabilityReader{}, err
 	}
 	if containsSelf(value, make(map[reflect.Type]bool)) {
-		return capabilityReader{}, fmt.Errorf("capability value type %v contains Self; use any to store a subject-dependent result", value)
+		return capabilityReader{}, fmt.Errorf("capability value type %v contains Self; use any to store an application-dependent result", value)
 	}
 	method, exists := capability.MethodByName(name)
 	if !exists || !method.IsExported() {
@@ -40,10 +40,10 @@ func compileCapabilityReader(value, capability reflect.Type, name string) (capab
 
 // resolve only reports capability unavailability. Optional readers can skip it;
 // required declarations retain the reason in their population error.
-func (r capabilityReader) resolve(subject reflect.Type) (reflect.Type, error) {
-	typ := ResolvePointerChain(subject)
+func (r capabilityReader) resolve(receivingType reflect.Type) (reflect.Type, error) {
+	typ := ResolvePointerChain(receivingType)
 	if typ == nil || typ.Kind() == reflect.Interface {
-		return nil, fmt.Errorf("%v cannot supply a declaration surrogate for %v", subject, r.contract.typ)
+		return nil, fmt.Errorf("%v cannot supply a declaration surrogate for %v", receivingType, r.contract.typ)
 	}
 	if err := r.contract.match(typ); err != nil {
 		return nil, err

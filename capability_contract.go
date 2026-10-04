@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-// A capability contract retains the interface as a signature template. Subjects
+// A capability contract retains the interface as a signature template. Application types
 // need not implement that literal interface when it contains Self.
 type capabilityContract struct {
 	typ       reflect.Type
@@ -89,52 +89,52 @@ func containsSelf(typ reflect.Type, seen map[reflect.Type]bool) bool {
 	return false
 }
 
-func (c capabilityContract) match(subject reflect.Type) error {
-	receiver := subject
+func (c capabilityContract) match(receivingType reflect.Type) error {
+	receiver := receivingType
 	receiverInputs := 0
-	if subject.Kind() != reflect.Interface {
-		receiver = reflect.PointerTo(subject)
+	if receivingType.Kind() != reflect.Interface {
+		receiver = reflect.PointerTo(receivingType)
 		receiverInputs = 1
 	}
 	if !c.templated {
 		if !receiver.Implements(c.typ) {
-			return fmt.Errorf("%v requires capability %v", subject, c.typ)
+			return fmt.Errorf("%v requires capability %v", receivingType, c.typ)
 		}
 		return nil
 	}
 	for _, expected := range c.methods {
 		actual, exists := receiver.MethodByName(expected.Name)
 		if !exists {
-			return fmt.Errorf("%v requires capability %v: missing method %s", subject, c.typ, expected.Name)
+			return fmt.Errorf("%v requires capability %v: missing method %s", receivingType, c.typ, expected.Name)
 		}
-		if !matchesCapabilitySignature(actual.Type, expected.Type, subject, receiverInputs) {
-			return fmt.Errorf("%v.%s has signature %v, expected %v with Self = %v", subject, expected.Name, actual.Type, expected.Type, subject)
+		if !matchesCapabilitySignature(actual.Type, expected.Type, receivingType, receiverInputs) {
+			return fmt.Errorf("%v.%s has signature %v, expected %v with Self = %v", receivingType, expected.Name, actual.Type, expected.Type, receivingType)
 		}
 	}
 	return nil
 }
 
-func matchesCapabilitySignature(actual, expected, subject reflect.Type, receiverInputs int) bool {
+func matchesCapabilitySignature(actual, expected, receivingType reflect.Type, receiverInputs int) bool {
 	// Concrete methods include their receiver; interface methods do not.
 	if actual.NumIn() != expected.NumIn()+receiverInputs || actual.NumOut() != expected.NumOut() || actual.IsVariadic() != expected.IsVariadic() {
 		return false
 	}
 	for i := 0; i < expected.NumIn(); i++ {
-		if actual.In(i+receiverInputs) != resolveSelf(expected.In(i), subject) {
+		if actual.In(i+receiverInputs) != resolveSelf(expected.In(i), receivingType) {
 			return false
 		}
 	}
 	for i := 0; i < expected.NumOut(); i++ {
-		if actual.Out(i) != resolveSelf(expected.Out(i), subject) {
+		if actual.Out(i) != resolveSelf(expected.Out(i), receivingType) {
 			return false
 		}
 	}
 	return true
 }
 
-func resolveSelf(typ, subject reflect.Type) reflect.Type {
+func resolveSelf(typ, receivingType reflect.Type) reflect.Type {
 	if typ == reflect.TypeFor[Self]() {
-		return subject
+		return receivingType
 	}
 	return typ
 }

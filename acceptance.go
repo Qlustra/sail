@@ -33,7 +33,7 @@ func AcceptKind(kind reflect.Kind) Acceptance {
 }
 
 // AcceptContract requires the interface contract I without invoking its methods.
-// Contract matching resolves subject pointer chains, retaining defined-type
+// Contract matching resolves application pointer chains, retaining defined-type
 // identity. Concrete T supports methods on T or *T; interface declarations use
 // their own method set. Self refers to that resolved receiving type.
 // Invalid contracts fail exploration rather than panicking here.
@@ -41,9 +41,9 @@ func AcceptContract[I any]() Acceptance {
 	return Acceptance{mode: acceptContract, typ: reflect.TypeFor[I]()}
 }
 
-// AcceptanceProvider optionally constrains the subject type for a chart,
+// AcceptanceProvider optionally constrains the application type for a legend,
 // region, or landmark. Accept follows the same zero-value contract as Mark and
-// is invoked once per location during exploration. The constraint supplements
+// is invoked once per marker declaration type during exploration. The constraint supplements
 // the marker's role requirements and never participates in mark selection.
 type AcceptanceProvider interface {
 	Accept() Acceptance

@@ -159,7 +159,7 @@ func validateTagComponent(value string, allowEmpty bool) error {
 }
 
 // validateTagValues checks trailing comma components independently of the
-// leading role or family. Their meaning is resolved against the schema later.
+// leading role or family. Their meaning is resolved against the chart later.
 func validateTagValues(values []string) error {
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
@@ -174,8 +174,8 @@ func validateTagValues(values []string) error {
 	return nil
 }
 
-// parsedMarkTag is local to one surveyed subject field. Compiled locations
-// never retain mutable tag parser instances or subject values.
+// parsedMarkTag is local to one surveyed application field. Compiled descriptors
+// never retain mutable tag parser instances or application values.
 type parsedMarkTag struct {
 	family string
 	values []string

@@ -54,8 +54,8 @@ func carrierPath(typ, carrier reflect.Type) ([]int, error) {
 	return nil, fmt.Errorf("%v: missing embedded carrier %v", typ, carrier)
 }
 
-// allocateDeclaration only initializes pointers along a selected schema path.
-// Subject types are inspected, never allocated here.
+// allocateDeclaration only initializes pointers along a selected declaration path.
+// Application types are inspected, never allocated here.
 func allocateDeclaration(value reflect.Value) (reflect.Value, error) {
 	if utilities.ResolvePointerChain(value.Type()) == nil {
 		return reflect.Value{}, fmt.Errorf("%v: cyclic declaration pointer type", value.Type())

@@ -7,23 +7,23 @@ import (
 	"slices"
 )
 
-// Course will describe a live subject traversal.
+// Course will describe a live application traversal.
 type Course struct{}
 
 // ErrTraversalNotImplemented indicates that live traversal and hydration are
-// not available yet. Schema compilation and field surveying are implemented.
-var ErrTraversalNotImplemented = errors.New("sail: live subject traversal is not implemented")
+// not available yet. Chart compilation and field surveying are implemented.
+var ErrTraversalNotImplemented = errors.New("sail: live application traversal is not implemented")
 
-func (w *World[C]) Traverse(subject any, course *Course) error {
+func (c *Chart[L]) Traverse(app any, course *Course) error {
 	return ErrTraversalNotImplemented
 }
 
-// A candidate preserves its occurrence in the enclosing location's lanes
-// and spots, while sharing the target's reusable location.
+// A candidate preserves its occurrence in the enclosing descriptor's lanes
+// and spots, while sharing the target's reusable descriptor.
 type candidate struct {
 	laneIndex int
 	spotIndex int
-	target    *location
+	target    *markerDescriptor
 }
 
 type match struct {
@@ -31,7 +31,7 @@ type match struct {
 	qualifiers []string
 }
 
-// survey selects a location by its compound mark among the caller's eligible
+// survey selects a descriptor by its compound mark among the caller's eligible
 // candidates. Lane advancement and receiving-type validation belong to traversal.
 // A nil match without an error means that no eligible candidate matched.
 func survey(field reflect.StructField, candidates []candidate, families markFamilies) (*match, error) {
@@ -41,7 +41,7 @@ func survey(field reflect.StructField, candidates []candidate, families markFami
 
 	for _, candidate := range candidates {
 		if candidate.target == nil {
-			return nil, fmt.Errorf("field %s: candidate has no target location", field.Name)
+			return nil, fmt.Errorf("field %s: candidate has no target descriptor", field.Name)
 		}
 		mark := candidate.target.mark
 		if missingTags[mark.tag] {
@@ -91,7 +91,7 @@ func survey(field reflect.StructField, candidates []candidate, families markFami
 	}
 	selected := &matches[0]
 	for _, value := range selected.qualifiers {
-		declared := slices.ContainsFunc(selected.candidate.target.qualifiers, func(q qualifier) bool { return q.symbol == value })
+		declared := slices.ContainsFunc(selected.candidate.target.qualifiers, func(q qualifierDescriptor) bool { return q.symbol == value })
 		if !declared {
 			return nil, fmt.Errorf("field %s: unknown qualifier %q for marker %v", field.Name, value, selected.candidate.target.typ)
 		}

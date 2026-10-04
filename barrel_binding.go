@@ -10,55 +10,55 @@ import (
 
 // A barrel describes one destination and its interface method. Repeated
 // bindings remain separate destinations and invoke independently.
-type barrel struct {
-	name        string
-	schemaField []int
-	capability  reflect.Type
-	method      reflect.Method
-	required    bool
+type barrelDescriptor struct {
+	name            string
+	declarationPath []int
+	capability      reflect.Type
+	method          reflect.Method
+	required        bool
 }
 
-func (l *location) collectBarrel(field reflect.StructField) error {
+func (d *markerDescriptor) collectBarrel(field reflect.StructField) error {
 	declaration, err := compileBarrel(field)
 	if err != nil {
-		return fmt.Errorf("%v.%s: %w", l.typ, field.Name, err)
+		return fmt.Errorf("%v.%s: %w", d.typ, field.Name, err)
 	}
-	l.barrels = append(l.barrels, declaration)
+	d.barrels = append(d.barrels, declaration)
 	return nil
 }
 
-func compileBarrel(field reflect.StructField) (barrel, error) {
+func compileBarrel(field reflect.StructField) (barrelDescriptor, error) {
 	typ := utilities.ResolvePointerChain(field.Type)
 	if typ == nil || typ.Kind() != reflect.Struct || !utilities.TypeImplements[barrelDeclaration](typ) {
-		return barrel{}, fmt.Errorf("barrel must embed sail.Barrel")
+		return barrelDescriptor{}, fmt.Errorf("barrel must embed sail.Barrel")
 	}
 	provider := reflect.New(typ).Interface().(barrelDeclaration)
 	shape, err := utilities.InvokeDeclaration(typ, "barrel", provider.barrel)
 	if err != nil {
-		return barrel{}, err
+		return barrelDescriptor{}, err
 	}
 	name, err := readSingleTag(field.Tag, "populate", validateSymbol)
 	if err != nil {
-		return barrel{}, err
+		return barrelDescriptor{}, err
 	}
 	method, err := shape.method(name)
 	if err != nil {
-		return barrel{}, err
+		return barrelDescriptor{}, err
 	}
 	required, err := readBarrelRequirement(field.Tag)
 	if err != nil {
-		return barrel{}, err
+		return barrelDescriptor{}, err
 	}
 	path, err := carrierPath(typ, shape.carrier)
 	if err != nil {
-		return barrel{}, err
+		return barrelDescriptor{}, err
 	}
-	return barrel{
-		name:        field.Name,
-		schemaField: slices.Concat(field.Index, path),
-		capability:  shape.capability,
-		method:      method,
-		required:    required,
+	return barrelDescriptor{
+		name:            field.Name,
+		declarationPath: slices.Concat(field.Index, path),
+		capability:      shape.capability,
+		method:          method,
+		required:        required,
 	}, nil
 }
 
@@ -95,26 +95,26 @@ func readBarrelRequirement(tags reflect.StructTag) (bool, error) {
 	return false, fmt.Errorf("invalid barrel requirement %q: expected optional or required", format.Raw)
 }
 
-func (l *location) populateBarrels(value reflect.Value, subject reflect.Type) error {
-	for _, barrel := range l.barrels {
-		if err := barrel.populate(value, subject); err != nil {
-			return fmt.Errorf("%v.%s: %w", l.typ, barrel.name, err)
+func (d *markerDescriptor) populateBarrels(value reflect.Value, receivingType reflect.Type) error {
+	for _, barrel := range d.barrels {
+		if err := barrel.populate(value, receivingType); err != nil {
+			return fmt.Errorf("%v.%s: %w", d.typ, barrel.name, err)
 		}
 	}
 	return nil
 }
 
-func (b barrel) populate(value reflect.Value, subject reflect.Type) error {
-	destination, err := declarationCarrier(value, b.schemaField)
+func (b barrelDescriptor) populate(value reflect.Value, receivingType reflect.Type) error {
+	destination, err := declarationCarrier(value, b.declarationPath)
 	if err != nil {
 		return err
 	}
-	typ := utilities.ResolvePointerChain(subject)
+	typ := utilities.ResolvePointerChain(receivingType)
 	// An interface declaration has no concrete implementation to instantiate.
 	// Pointer cycles likewise cannot supply a declaration surrogate.
 	if typ == nil || typ.Kind() == reflect.Interface || !reflect.PointerTo(typ).Implements(b.capability) {
 		if b.required {
-			return fmt.Errorf("required barrel: %v cannot supply a declaration surrogate for %v.%s", subject, b.capability, b.method.Name)
+			return fmt.Errorf("required barrel: %v cannot supply a declaration surrogate for %v.%s", receivingType, b.capability, b.method.Name)
 		}
 		return nil
 	}

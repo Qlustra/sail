@@ -8,47 +8,47 @@ import (
 	"github.com/qlustra/sail/internals/utilities"
 )
 
-type quality struct {
-	name        string
-	schemaField []int
-	reader      capabilityReader
+type qualityDescriptor struct {
+	name            string
+	declarationPath []int
+	reader          capabilityReader
 }
 
-func compileQuality(field reflect.StructField) (quality, error) {
+func compileQuality(field reflect.StructField) (qualityDescriptor, error) {
 	typ := utilities.ResolvePointerChain(field.Type)
 	if typ == nil || typ.Kind() != reflect.Struct || !utilities.TypeImplements[qualityDeclaration](typ) {
-		return quality{}, fmt.Errorf("quality must embed sail.Quality")
+		return qualityDescriptor{}, fmt.Errorf("quality must embed sail.Quality")
 	}
 	provider := reflect.New(typ).Interface().(qualityDeclaration)
 	shape, err := utilities.InvokeDeclaration(typ, "quality", provider.quality)
 	if err != nil {
-		return quality{}, err
+		return qualityDescriptor{}, err
 	}
 	name, err := readSingleTag(field.Tag, "populate", validateSymbol)
 	if err != nil {
-		return quality{}, err
+		return qualityDescriptor{}, err
 	}
 	reader, err := compileCapabilityReader(shape.value, shape.capability, name)
 	if err != nil {
-		return quality{}, err
+		return qualityDescriptor{}, err
 	}
 	path, err := carrierPath(typ, shape.carrier)
 	if err != nil {
-		return quality{}, err
+		return qualityDescriptor{}, err
 	}
-	return quality{
-		name:        field.Name,
-		schemaField: slices.Concat(field.Index, path),
-		reader:      reader,
+	return qualityDescriptor{
+		name:            field.Name,
+		declarationPath: slices.Concat(field.Index, path),
+		reader:          reader,
 	}, nil
 }
 
-func (q quality) populate(value reflect.Value, subject reflect.Type) error {
-	receiver, err := q.reader.resolve(subject)
+func (q qualityDescriptor) populate(value reflect.Value, receivingType reflect.Type) error {
+	receiver, err := q.reader.resolve(receivingType)
 	if err != nil {
 		return fmt.Errorf("required quality: %w", err)
 	}
-	destination, err := declarationCarrier(value, q.schemaField)
+	destination, err := declarationCarrier(value, q.declarationPath)
 	if err != nil {
 		return err
 	}

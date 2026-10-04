@@ -8,24 +8,24 @@ import (
 )
 
 // acceptance retains the declaration and any compiled method signatures.
-// Its zero value represents a location without an Accept hook.
+// Its zero value represents a descriptor without an Accept hook.
 type acceptance struct {
 	declaration Acceptance
 	contract    capabilityContract
 }
 
-func (l *location) collectAcceptance(surrogate any) error {
+func (d *markerDescriptor) collectAcceptance(surrogate any) error {
 	provider, ok := surrogate.(AcceptanceProvider)
 	if !ok {
 		return nil
 	}
-	declaration, err := utilities.InvokeDeclaration(l.typ, "Accept", provider.Accept)
+	declaration, err := utilities.InvokeDeclaration(d.typ, "Accept", provider.Accept)
 	if err != nil {
 		return err
 	}
-	l.acceptance, err = compileAcceptance(declaration)
+	d.acceptance, err = compileAcceptance(declaration)
 	if err != nil {
-		return fmt.Errorf("%v.Accept(): %w", l.typ, err)
+		return fmt.Errorf("%v.Accept(): %w", d.typ, err)
 	}
 	return nil
 }
@@ -51,23 +51,23 @@ func compileAcceptance(declaration Acceptance) (acceptance, error) {
 	return compiled, nil
 }
 
-func (a acceptance) match(subject reflect.Type) error {
+func (a acceptance) match(receivingType reflect.Type) error {
 	switch a.declaration.mode {
 	case acceptExact:
-		if subject != a.declaration.typ {
-			return fmt.Errorf("expected exactly %v, got %v", a.declaration.typ, subject)
+		if receivingType != a.declaration.typ {
+			return fmt.Errorf("expected exactly %v, got %v", a.declaration.typ, receivingType)
 		}
 	case acceptKind:
-		if subject.Kind() != a.declaration.kind {
-			return fmt.Errorf("expected kind %v, got %v (kind %v)", a.declaration.kind, subject, subject.Kind())
+		if receivingType.Kind() != a.declaration.kind {
+			return fmt.Errorf("expected kind %v, got %v (kind %v)", a.declaration.kind, receivingType, receivingType.Kind())
 		}
 	case acceptContract:
-		typ := utilities.ResolvePointerChain(subject)
+		typ := utilities.ResolvePointerChain(receivingType)
 		if typ == nil {
-			return fmt.Errorf("cannot resolve receiving type %v for contract %v", subject, a.contract.typ)
+			return fmt.Errorf("cannot resolve receiving type %v for contract %v", receivingType, a.contract.typ)
 		}
 		if err := a.contract.match(typ); err != nil {
-			return fmt.Errorf("expected contract %v, got %v: %w", a.contract.typ, subject, err)
+			return fmt.Errorf("expected contract %v, got %v: %w", a.contract.typ, receivingType, err)
 		}
 	}
 	return nil

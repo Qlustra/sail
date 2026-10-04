@@ -2,15 +2,15 @@ package sail
 
 import "reflect"
 
-// Self is a capability signature placeholder for the receiving subject type.
-// Quality, ReadCapability, and AcceptContract resolve subject pointers before
+// Self is a capability signature placeholder for the receiving application type.
+// Quality, ReadCapability, and AcceptContract resolve application pointers before
 // matching Self, retaining the identity of the defined type. Self may appear as a
 // method's parameter or result; compound types containing Self are unsupported.
 // It is a contract placeholder, never the stored value type.
 type Self struct{}
 
 // ReadCapability invokes a declaration method on a fresh zero-valued surrogate
-// of subject's receiving type. I must be an interface whose selected method is
+// of receivingType. I must be an interface whose selected method is
 // exported, takes no arguments, and returns one value assignable to V.
 // Self in I matches the receiving type after pointer normalization, following
 // the same signature rules as Quality.
@@ -22,16 +22,16 @@ type Self struct{}
 // A successful zero or nil result still returns present=true. Use V=any to
 // retain the dynamic type of a Self result.
 //
-// No live subject is inspected or mutated. The method must not depend on
+// No live application is inspected or mutated. The method must not depend on
 // initialized application state. Each call invokes independently; results are
 // not cached. Qualities reuse this machinery and require capability presence
 // when their owning qualifier is active.
-func ReadCapability[V, I any](subject reflect.Type, method string) (value V, present bool, err error) {
+func ReadCapability[V, I any](receivingType reflect.Type, method string) (value V, present bool, err error) {
 	reader, err := compileCapabilityReader(reflect.TypeFor[V](), reflect.TypeFor[I](), method)
 	if err != nil {
 		return value, false, err
 	}
-	receiver, unavailable := reader.resolve(subject)
+	receiver, unavailable := reader.resolve(receivingType)
 	if unavailable != nil {
 		return value, false, nil
 	}

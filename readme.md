@@ -1,17 +1,51 @@
 Sail
 ====
 
+## Vocabulary and lifecycle
+
+Sail is a meta-framework for interpreting application declarations. A framework
+such as Dome authors a **Legend**; a CLI authors an **Application**.
+
+| Term | Meaning |
+| --- | --- |
+| Legend | The framework's authored declaration, rooted in `sail.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
+| Chart | The reusable compiled descriptor graph produced by exploring with a Legend. Its Go type is `sail.Chart[L]`. |
+| Application | The consumer's Go declaration `A`, or a live instance of it. State which when the distinction matters. |
+| World | The populated `*L` describing a particular Application declaration. It holds marker occurrences and their metadata. |
+| Populated marker | A marker value representing a particular place in the Application declaration. |
+| Application reference | A populated marker's recorded root type, receiving type, and field path, used for later live binding. |
+
+**Declarations** are authored Go structures. **Descriptors** are Sail's internal
+compiled representation. The World currently reuses the Legend's Go shape as
+its storage: `Populate` returns `*L`, not a separate `World[L]` wrapper.
+
+```mermaid
+flowchart LR
+    L["Legend declaration L"] -->|"Explore[L]()"| C["Chart[L]: compiled descriptors"]
+    C --> P["Populate[A](chart)"]
+    A["Application declaration A"] --> P
+    P --> W["World: populated *L"]
+    W --> M["Populated marker with Application reference"]
+    M --> B["Bind[I](app, marker)"]
+    I["Live Application instance"] --> B
+    B --> R["Interface receiver I"]
+```
+
+Exploration and population inspect declarations. Population invokes declared
+capabilities on zero-valued surrogates; it requires no live Application instance.
+Binding resolves a populated marker against existing Application storage. Navigation,
+Course selection, and cascading walking remain unimplemented.
+
 ## Population
 
-`Explore[C]()` compiles the chart declaration once. `Populate[S](world)` then
-returns a fresh `*C` populated against **S's type**, without requiring a live S
-instance. Declared capabilities use zero-valued surrogates. The world contains
-reusable schema definitions; populated markers
-hold the metadata and subject field references for individual occurrences.
-Populated markers expose `SubjectType()` and a copied `SubjectPath()` so consumers
-can interpret receiving types and retain declaration order across spot kinds.
+`Explore[L]()` builds a Chart with the Legend declaration L.
+`Populate[A](chart)` returns a fresh World (`*L`) populated against **A's type**.
+The Chart holds reusable descriptors; populated markers hold metadata and
+Application references for individual occurrences. Markers expose
+`ApplicationType()` and a copied `ApplicationPath()` so consumers can interpret
+receiving types and retain declaration order across spot kinds.
 
-Population reads marked subject fields in declaration order, selecting spots
+Population reads marked Application fields in declaration order, selecting spots
 within the current lane. An unmatched field advances to the next lane only
 after the current lane's minimum counts are satisfied. A matched spot exceeding
 its maximum fails immediately; population does not retry another lane to make
@@ -19,21 +53,22 @@ the counts fit. End of declaration validates every remaining minimum.
 
 Features receive text from their named tags. Qualifiers receive the remaining
 mark values after discriminant selection. Untagged fields are ignored; marked
-fields must be exported and match a remaining spot. Charts and regions apply
+fields must be exported and match a remaining spot. Legends and regions apply
 to structs (including through pointers); landmarks describe leaf declarations.
 
-Single spots hold one marker, optional spots hold a marker pointer or nil, and
-multi spots hold a slice. Repeated subject types are populated independently.
-An active cycle of the same marker and subject types is rejected because it
-would require an infinite expansion. Live subject binding remains separate.
+Single spots hold one marker in `Value`, optional spots hold a marker pointer
+or nil in `Value`, and multi spots hold a slice in `Value`. Repeated Application
+types are populated independently.
+An active cycle of the same marker and Application types is rejected because it
+would require an infinite expansion. Live Application binding remains separate.
 
 ## Live binding
 
-`Bind[I](subject, occurrence)` resolves one populated marker against the live
-subject and returns an ordinary Go interface receiver:
+`Bind[I](app, marker)` resolves one populated marker against the live
+Application and returns an ordinary Go interface receiver:
 
 ```go
-command := &chart.EntryPoint.MainCommand.Subject
+command := &world.EntryPoint.MainCommand.Value
 receiver, present, err := sail.Bind[Runnable](&program, command)
 if err != nil {
 	return err
@@ -45,8 +80,8 @@ if present {
 
 The root must be a nonnil pointer leading to the exact recorded root type;
 additional pointer wrappers are allowed. Sail follows the stored field path
-without allocating subjects or constructing addressable copies. Addressable
-concrete fields bind through their address when it implements I, preserving the
+without allocating Application storage or constructing addressable copies.
+Addressable concrete fields bind through their address when it implements I, preserving the
 connection to their original storage even for value-receiver interfaces.
 
 Interface fields expose their current dynamic receiver. A stored non-pointer
@@ -60,7 +95,7 @@ storage, inaccessible receivers, and receiver cycles produce contextual errors.
 I must be an interface; `Self` signature templates are not substituted into a
 runtime Go interface.
 
-Binding invokes no subject methods and does not traverse siblings or descendants.
+Binding invokes no Application methods and does not traverse siblings or descendants.
 The caller owns invocation and its error handling. Course selection and cascading
 walking remain separate work.
 
@@ -74,8 +109,8 @@ func (EnumOptionLandmark) Accept() sail.Acceptance {
 }
 ```
 
-Exploration invokes `Accept` once per location on its zero-valued surrogate and
-compiles the returned rule. Returning an empty `sail.Acceptance`, an invalid
+Exploration invokes `Accept` once per marker declaration type on its zero-valued
+surrogate and records the compiled rule in its descriptor. Returning an empty `sail.Acceptance`, an invalid
 kind or contract, or panicking in the hook fails exploration. The declaration
 builders do not panic on invalid input. Without the hook, existing role
 requirements apply.
@@ -93,16 +128,16 @@ Each declaration selects one rule:
   defined-type identity. Concrete types support methods on T or *T; interface
   declarations use their own method set. Direct `Self` parameters and results
   resolve to T, including when T is an interface. No surrogate is constructed
-  and no subject method is invoked. Non-interface contracts and unsupported
+  and no Application method is invoked. Non-interface contracts and unsupported
   `Self` signatures fail exploration. Barrels and qualities still require
   concrete receivers for invocation.
 
 Population checks acceptance before filling that occurrence's metadata,
-descending, or invoking its capabilities. Charts and regions must still resolve
+descending, or invoking its capabilities. Legends and regions must still resolve
 to structs. Rule combinations and collection element constraints are not defined.
 
 Marks and lanes select the occurrence first. An acceptance mismatch fails with
-the subject path, marker, expected type, and actual type; it does not retry
+the Application path, marker, expected type, and actual type; it does not retry
 another spot or advance the lane. Only selected occurrences are checked;
 untagged fields remain outside population.
 
@@ -126,17 +161,17 @@ func (CommandRegion) Family() string { return "command" }
 
 The capability must be an interface. Its selected method must be exported, take
 no arguments, and return exactly one value assignable to the barrel's value
-type. Exploration validates this contract before any subject is populated.
+type. Exploration validates this contract before any World is populated.
 
 Omitting `barrel` means `barrel:"optional"`: an unavailable capability leaves
 the barrel empty. `barrel:"required"` instead makes absence a population error.
 Availability requires a concrete receiving type whose pointer implements the
-interface; this covers value and pointer methods. An interface-typed subject
+interface; this covers value and pointer methods. An interface-typed Application
 field cannot supply a concrete surrogate from its static declaration alone.
 
 After the occurrence's fields and child lanes are populated, each barrel calls
 its selected method on a fresh zero-valued surrogate. Hooks must work without
-initialized application state. A hook panic fails population with the subject
+initialized application state. A hook panic fails population with the Application
 path and barrel field in the error. Multiple barrels may select the same method;
 they invoke independently and each stores its result.
 
@@ -148,7 +183,7 @@ population hook is required.
 ## Qualities
 
 A qualifier composite can declare capabilities required when its symbol is
-present on a subject occurrence:
+present on an Application occurrence:
 
 ```go
 type Defaultable[T any] interface {
@@ -172,7 +207,7 @@ type Remote string
 func (Remote) Default() Remote { return "origin" }
 ```
 
-For a subject field `Remote Remote` marked with `arg,default`, population
+For an Application field `Remote Remote` marked with `arg,default`, population
 requires and invokes `Default() Remote`. Without the qualifier, the quality
 stays inactive: no capability is required or invoked. This association comes
 from nesting, not from the symbol's meaning. Reusable qualifier wrappers retain
@@ -180,7 +215,7 @@ the qualities declared along their embedded `Qualifier` path.
 
 `Self` matches the receiving type after pointer normalization, preserving
 defined-type identity. It is a signature placeholder, not a Go interface that
-the subject must literally implement. Sail checks the entire capability's
+the Application type must literally implement. Sail checks the entire capability's
 method set. This slice supports Self directly in method parameters and results;
 compound uses such as `[]Self` and `*Self` fail exploration. Interfaces using
 Self must have exported methods. Ordinary interfaces use Go's implementation
@@ -195,7 +230,7 @@ interface containing the actual `Remote` value, not a converted string.
 Each active quality invokes its method on a fresh zero-valued surrogate, after
 the occurrence's fields and child lanes are populated. Missing or mismatched
 capabilities, incompatible storage, and hook panics fail population with the
-subject and qualifier context. `Present()` distinguishes an inactive quality
+Application and qualifier context. `Present()` distinguishes an inactive quality
 from a successful zero or nil result. Reading a quality never invokes or
 validates its value. Live-value parsing and validation remain separate.
 
@@ -207,7 +242,7 @@ interface remains an interface; a declaration alone cannot resolve its concrete
 implementation.
 
 `ReadCapability[V, I](typ, method)` reads a declaration capability without a
-chart or qualifier. It uses the same contract matching and invocation machinery
+Chart or qualifier. It uses the same contract matching and invocation machinery
 as qualities:
 
 ```go
@@ -222,19 +257,19 @@ rules as qualities. In this example, `value` contains a `Remote`, preserving its
 dynamic type.
 
 An unavailable or incompatible capability returns `present == false` without
-an error. This includes nil, cyclic pointer, and interface subject types that
+an error. This includes nil, cyclic pointer, and interface Application types that
 cannot supply a surrogate. Invalid capability requests, incompatible storage,
 and hook panics return errors. A successful zero or nil result still returns
 `present == true`.
 
 Every call constructs a fresh zero-valued surrogate and invokes independently;
-it does not access a live subject or cache results. The caller decides whether
+it does not access a live Application or cache results. The caller decides whether
 to request a capability and how to use its result. Qualities instead retain
-their compiled reader in the schema and require presence when activated.
+their compiled reader in the Chart and require presence when activated.
 
 ## Lane policies
 
-Lanes form ordered bands in a subject's declaration. Spots are unordered
+Lanes form ordered bands in an Application declaration. Spots are unordered
 alternatives within a lane. The `exploration` tag declares how fields are
 assigned to lanes:
 

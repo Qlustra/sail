@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// mark identifies one location within a tag's mark family. It owns its
+// mark identifies one descriptor within a tag's mark family. It owns its
 // normalized discriminator slice; declarations may safely reuse their input.
 type mark struct {
 	tag           string
@@ -36,7 +36,7 @@ type markFamily struct {
 }
 
 // Discriminator vocabulary is global to a family, even where only some of the
-// family's locations are eligible. This prevents an unavailable variant from
+// family's descriptors are eligible. This prevents an unavailable variant from
 // being interpreted as an ordinary mark with extra qualifiers.
 type markFamilies map[markFamily]map[string]struct{}
 
@@ -66,29 +66,29 @@ func newMark(tag, family string, discriminants []string) (mark, error) {
 }
 
 // compileMarkFamilies runs after graph discovery, when every reachable
-// location has contributed its discriminator vocabulary.
-func compileMarkFamilies(locations []*location) (markFamilies, error) {
+// descriptor has contributed its discriminator vocabulary.
+func compileMarkFamilies(descriptors []*markerDescriptor) (markFamilies, error) {
 	families := make(markFamilies)
-	for _, location := range locations {
-		if location == nil {
-			return nil, fmt.Errorf("cannot compile a nil location")
+	for _, descriptor := range descriptors {
+		if descriptor == nil {
+			return nil, fmt.Errorf("cannot compile a nil descriptor")
 		}
-		family := markFamily{tag: location.mark.tag, family: location.mark.family}
+		family := markFamily{tag: descriptor.mark.tag, family: descriptor.mark.family}
 		vocabulary := families[family]
 		if vocabulary == nil {
 			vocabulary = make(map[string]struct{})
 			families[family] = vocabulary
 		}
-		for _, discriminator := range location.mark.discriminants {
+		for _, discriminator := range descriptor.mark.discriminants {
 			vocabulary[discriminator] = struct{}{}
 		}
 	}
 
-	for _, location := range locations {
-		family := markFamily{tag: location.mark.tag, family: location.mark.family}
-		for _, qualifier := range location.qualifiers {
+	for _, descriptor := range descriptors {
+		family := markFamily{tag: descriptor.mark.tag, family: descriptor.mark.family}
+		for _, qualifier := range descriptor.qualifiers {
 			if _, conflict := families[family][qualifier.symbol]; conflict {
-				return nil, fmt.Errorf("location %v: qualifier %q conflicts with a discriminator in mark family %q/%q", location.typ, qualifier.symbol, family.tag, family.family)
+				return nil, fmt.Errorf("descriptor %v: qualifier %q conflicts with a discriminator in mark family %q/%q", descriptor.typ, qualifier.symbol, family.tag, family.family)
 			}
 		}
 	}
