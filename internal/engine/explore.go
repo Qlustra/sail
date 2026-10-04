@@ -195,6 +195,9 @@ func (e *explorer) collectSpots(t reflect.Type) ([]spotDescriptor, error) {
 		if spotType == nil || spotType.Kind() != reflect.Struct {
 			return nil, fmt.Errorf("%v.%s: spot must resolve to a struct", t, field.Name)
 		}
+		if err := validateSpotEmbeddings(spotType); err != nil {
+			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
+		}
 		surrogate := reflect.New(spotType).Interface().(decl.SpotDeclaration)
 		shape, err := capability.InvokeDeclaration(spotType, "spot", func() decl.SpotShape { return decl.DescribeSpot(surrogate) })
 		if err != nil {

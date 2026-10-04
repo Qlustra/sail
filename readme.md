@@ -102,6 +102,9 @@ to structs (including through pointers); landmarks describe leaf declarations.
 Single spots hold one marker in `Value`, optional spots hold a marker pointer
 or nil in `Value`, and multi spots hold a slice in `Value`. Repeated Application
 types are populated independently.
+Composite spot declarations must embed their spot carrier and intermediate
+wrappers by value. Exploration rejects pointer embeddings along that chain;
+`OptionalSpot.Value` still uses nil to represent an absent occurrence.
 An active cycle of the same marker and Application types is rejected because it
 would require an infinite expansion. Live Application binding remains separate.
 
