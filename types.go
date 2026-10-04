@@ -3,7 +3,7 @@ package sail
 import (
 	"reflect"
 
-	"github.com/qlustra/sail/internals/utilities"
+	"github.com/qlustra/sail/internal/reflectutils"
 )
 
 // ResolvePointerChain returns the first non-pointer type in typ's pointer
@@ -11,5 +11,5 @@ import (
 // return nil. Interface types remain interfaces; resolving them would require
 // a live value.
 func ResolvePointerChain(typ reflect.Type) reflect.Type {
-	return utilities.ResolvePointerChain(typ)
+	return reflectutils.ResolvePointerChain(typ)
 }

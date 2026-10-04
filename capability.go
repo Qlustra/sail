@@ -1,13 +1,10 @@
 package sail
 
-import "reflect"
+import (
+	"reflect"
 
-// Self is a capability signature placeholder for the receiving application type.
-// Quality, ReadCapability, and AcceptContract resolve application pointers before
-// matching Self, retaining the identity of the defined type. Self may appear as a
-// method's parameter or result; compound types containing Self are unsupported.
-// It is a contract placeholder, never the stored value type.
-type Self struct{}
+	"github.com/qlustra/sail/internal/capability"
+)
 
 // ReadCapability invokes a declaration method on a fresh zero-valued surrogate
 // of receivingType. I must be an interface whose selected method is
@@ -27,20 +24,19 @@ type Self struct{}
 // not cached. Qualities reuse this machinery and require capability presence
 // when their owning qualifier is active.
 func ReadCapability[V, I any](receivingType reflect.Type, method string) (value V, present bool, err error) {
-	reader, err := compileCapabilityReader(reflect.TypeFor[V](), reflect.TypeFor[I](), method)
+	reader, err := capability.CompileReader(reflect.TypeFor[V](), reflect.TypeFor[I](), method)
 	if err != nil {
 		return value, false, err
 	}
-	receiver, unavailable := reader.resolve(receivingType)
+	receiver, unavailable := reader.Resolve(receivingType)
 	if unavailable != nil {
 		return value, false, nil
 	}
-	result, err := reader.read(receiver)
+	result, err := reader.Read(receiver)
 	if err != nil {
 		return value, false, err
 	}
-	// Reflection assignment preserves nil interface results and applies the
-	// checked assignability contract without a potentially failing assertion.
+	// Preserve nil interface results and the compiled assignability contract.
 	reflect.ValueOf(&value).Elem().Set(result)
 	return value, true, nil
 }

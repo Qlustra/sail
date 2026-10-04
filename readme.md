@@ -1,6 +1,49 @@
 Sail
 ====
 
+## Packages
+
+Sail has two public packages in one module:
+
+| Import | Responsibility |
+| --- | --- |
+| `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated state. |
+| `github.com/qlustra/sail` | Operations: `Chart[L]`, `Explore`, `Populate`, `Bind`, `ReadCapability`, and `ResolvePointerChain`. `Course` and traversal remain placeholders. |
+
+Declaration examples use `legend`:
+
+```go
+import "github.com/qlustra/sail/legend"
+
+type ProgramLegend struct {
+	legend.Legend
+	// Declare lanes and spots here.
+}
+
+func (ProgramLegend) Mark() string { return "app" }
+```
+
+Orchestration imports root `sail` for `sail.Explore[ProgramLegend]()` and
+`sail.Populate[App](chart)`.
+
+The implementation is organized under `internal/`:
+
+| Package | Responsibility |
+| --- | --- |
+| `declaration` | Canonical declaration carriers, populated state, application references, and the sealed access used by the engine. Public `legend` types alias these carriers. |
+| `engine` | Compiled descriptors, exploration, population, and live binding through application references. |
+| `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
+| `tags` | Tag parsing and validation. |
+| `reflectutils` | Type inspection, field access, and receiver binding, independent of Sail's declaration model. |
+
+`Chart[L]` keeps compiled descriptors private. Public `legend` carriers alias
+canonical internal declaration types, so reflection reports those canonical type
+names. The aliases retain the sealed protocols used for inspection and population
+without exposing those operations in the public declaration API.
+
+Consumers use the public packages. The internal division introduces no additional
+module or World wrapper; the populated result remains `*L`.
+
 ## Vocabulary and lifecycle
 
 Sail is a meta-framework for interpreting application declarations. A framework
@@ -8,7 +51,7 @@ such as Dome authors a **Legend**; a CLI authors an **Application**.
 
 | Term | Meaning |
 | --- | --- |
-| Legend | The framework's authored declaration, rooted in `sail.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
+| Legend | The framework's authored declaration, rooted in `legend.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
 | Chart | The reusable compiled descriptor graph produced by exploring with a Legend. Its Go type is `sail.Chart[L]`. |
 | Application | The consumer's Go declaration `A`, or a live instance of it. State which when the distinction matters. |
 | World | The populated `*L` describing a particular Application declaration. It holds marker occurrences and their metadata. |
@@ -104,13 +147,13 @@ walking remain separate work.
 A marker can constrain its receiving type with an optional declaration hook:
 
 ```go
-func (EnumOptionLandmark) Accept() sail.Acceptance {
-	return sail.AcceptExact[bool]()
+func (EnumOptionLandmark) Accept() legend.Acceptance {
+	return legend.AcceptExact[bool]()
 }
 ```
 
 Exploration invokes `Accept` once per marker declaration type on its zero-valued
-surrogate and records the compiled rule in its descriptor. Returning an empty `sail.Acceptance`, an invalid
+surrogate and records the compiled rule in its descriptor. Returning an empty `legend.Acceptance`, an invalid
 kind or contract, or panicking in the hook fails exploration. The declaration
 builders do not panic on invalid input. Without the hook, existing role
 requirements apply.
@@ -152,8 +195,8 @@ type Descriptive interface {
 }
 
 type CommandRegion struct {
-	sail.Region
-	Description sail.Barrel[string, Descriptive] `sail:"barrel" populate:"About"`
+	legend.Region
+	Description legend.Barrel[string, Descriptive] `sail:"barrel" populate:"About"`
 }
 
 func (CommandRegion) Family() string { return "command" }
@@ -191,12 +234,12 @@ type Defaultable[T any] interface {
 }
 
 type DefaultQualifier struct {
-	sail.Qualifier
-	Value sail.Quality[any, Defaultable[sail.Self]] `sail:"quality" populate:"Default"`
+	legend.Qualifier
+	Value legend.Quality[any, Defaultable[legend.Self]] `sail:"quality" populate:"Default"`
 }
 
 type Argument struct {
-	sail.Landmark
+	legend.Landmark
 	Default DefaultQualifier `sail:"qualifier" symbol:"default"`
 }
 
@@ -246,7 +289,7 @@ Chart or qualifier. It uses the same contract matching and invocation machinery
 as qualities:
 
 ```go
-value, present, err := sail.ReadCapability[any, Defaultable[sail.Self]](
+value, present, err := sail.ReadCapability[any, Defaultable[legend.Self]](
 	reflect.TypeFor[Remote](), "Default",
 )
 ```
