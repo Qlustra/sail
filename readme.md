@@ -124,7 +124,7 @@ course := sail.Course{
 
 err := chart.Traverse(world, sail.Traversal{
     Course: course,
-    Visit: sail.On(func(command *CommandRegion, encounter sail.Encounter) error {
+    Visit: sail.Visit(func(command *CommandRegion, encounter sail.Encounter) error {
         fmt.Println(encounter.Depth(), command.Name.Get(), encounter.Destination())
         return nil
     }),
@@ -149,12 +149,28 @@ receive a pointer to that copy. Nested pointers, slices, and maps retain normal
 Go sharing semantics. Predicates must be read-only; Sail does not deep-copy the
 World or detect mutations. Interface adaptation prefers the marker's pointer.
 
-`On[T]` invokes its callback only for matching selected markers. A skipped callback
-does not remove a waypoint or prevent later visits. Pointer visitors receive the
-original World marker, not the predicate's copy. The topology must remain stable
-during planning and execution. No declaration hooks or live Application methods
-are invoked by navigation itself. Selector and visitor panics propagate normally.
-Returning a visitor error ends execution and preserves its cause through wrapping.
+`Traversal.Visit` always holds a `sail.Visitors` list. `Visit[T]` constructs a
+single-item list; `On[T]` constructs one visitor for composing a list:
+
+```go
+Visit: sail.Visitors{
+    sail.On(inspectCommand),
+    sail.On(inspectFlagBag),
+    sail.On(inspectFlag),
+},
+```
+
+Each selected encounter passes through the list in registration order. Every
+matching typed visitor runs; an unmatched callback does not remove a waypoint or
+prevent other visitors from participating. Pointer visitors receive the original
+World marker, so later visitors see earlier visitors' metadata changes. Visitor
+registrations are copied on entry; the list must be nonempty and contain no nil
+entries, checked before selectors or visitors run.
+
+The topology must remain stable during planning and execution. No declaration
+hooks or live Application methods are invoked by navigation itself. Selector and
+visitor panics propagate normally. The first visitor error ends both the list and
+the traversal, preserving its cause with waypoint and visitor context.
 
 An **Encounter** records the arrival and its route context:
 
@@ -169,7 +185,7 @@ An **Encounter** records the arrival and its route context:
   slice index, zero for single/optional spots, or -1 at the root. These describe
   World storage, independently of the marker's `ApplicationPath()`.
 
-This slice requires a nonempty Course and a visitor. It does not provide crawling,
+This slice requires a nonempty Course and visitor list. It does not provide crawling,
 descendant-search waypoints, movement controls, or live Application traversal.
 
 ## Live binding
