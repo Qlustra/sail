@@ -8,7 +8,7 @@ Sail has two public packages in one module:
 | Import | Responsibility |
 | --- | --- |
 | `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated state. |
-| `github.com/qlustra/sail` | Operations: `Chart[L]`, `Explore`, `Populate`, `Bind`, `ReadCapability`, and `ResolvePointerChain`. `Course` and traversal remain placeholders. |
+| `github.com/qlustra/sail` | Operations: `Chart[L]`, `Explore`, `Populate`, Course-based World traversal, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
 
 Declaration examples use `legend`:
 
@@ -31,7 +31,7 @@ The implementation is organized under `internal/`:
 | Package | Responsibility |
 | --- | --- |
 | `declaration` | Canonical declaration carriers, populated state, application references, and the sealed access used by the engine. Public `legend` types alias these carriers. |
-| `engine` | Compiled descriptors, exploration, population, and live binding through application references. |
+| `engine` | Compiled descriptors, exploration, population, World navigation and route planning, and live binding through application references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
 | `reflectutils` | Type inspection, field access, and receiver binding, independent of Sail's declaration model. |
@@ -76,8 +76,9 @@ flowchart LR
 
 Exploration and population inspect declarations. Population invokes declared
 capabilities on zero-valued surrogates; it requires no live Application instance.
-Binding resolves a populated marker against existing Application storage. Navigation,
-Course selection, and cascading walking remain unimplemented.
+World traversal resolves connected Courses using the Chart, then visits selected
+markers. Binding resolves a populated marker against existing Application storage.
+Unrestricted crawling and live Application traversal remain future work.
 
 ## Population
 
@@ -107,6 +108,69 @@ wrappers by value. Exploration rejects pointer embeddings along that chain;
 `OptionalSpot.Value` still uses nil to represent an absent occurrence.
 An active cycle of the same marker and Application types is rejected because it
 would require an infinite expansion. Live Application binding remains separate.
+
+## World traversal
+
+A **Course** is a reusable sequence of **Waypoints**. Each waypoint selects
+exactly one immediate child marker, starting at the World root:
+
+```go
+course := sail.Course{
+    sail.Select[*CommandRegion](),
+    sail.Select(func(command *CommandRegion) bool {
+        return command.Name.Get() == "validate"
+    }),
+}
+
+err := chart.Traverse(world, sail.Traversal{
+    Course: course,
+    Visit: sail.On(func(command *CommandRegion, encounter sail.Encounter) error {
+        fmt.Println(encounter.Depth(), command.Name.Get(), encounter.Destination())
+        return nil
+    }),
+})
+```
+
+The World navigator follows the Chart's lane and spot descriptors to existing
+populated markers. Lanes and spots describe incoming relationships, not extra
+waypoints. A selector never searches deeper descendants to fill a missing step.
+Lane order is preserved; candidates within a lane follow Application declaration
+order across spot kinds. Nil optional spots and empty multi spots have no children.
+
+Before processing, Sail resolves the **entire Course** into an internal
+**RoutePlan**. Every step must have exactly one match; a missing or ambiguous
+later step fails without invoking any visitor. A Course stores only selection
+instructions and may be reused against another compatible World. A RoutePlan
+retains the concrete occurrences for that execution and is not exposed publicly.
+
+`Select[T]()` matches marker values, pointers, or interfaces; its optional
+predicate receives a **shallow copy of the concrete marker**. Pointer predicates
+receive a pointer to that copy. Nested pointers, slices, and maps retain normal
+Go sharing semantics. Predicates must be read-only; Sail does not deep-copy the
+World or detect mutations. Interface adaptation prefers the marker's pointer.
+
+`On[T]` invokes its callback only for matching selected markers. A skipped callback
+does not remove a waypoint or prevent later visits. Pointer visitors receive the
+original World marker, not the predicate's copy. The topology must remain stable
+during planning and execution. No declaration hooks or live Application methods
+are invoked by navigation itself. Selector and visitor panics propagate normally.
+Returning a visitor error ends execution and preserves its cause through wrapping.
+
+An **Encounter** records the arrival and its route context:
+
+- `Marker()` returns the populated marker pointer; `Parent()` returns its parent
+  encounter and a presence flag. The root Legend is retained as an ancestor but
+  is not itself visited.
+- `Depth()` counts marker edges from the root (zero); the first selected marker
+  has depth one. `Step()` is the zero-based Course index, or -1 at the root.
+- `Destination()` identifies the final selected marker.
+- `LanePath()` is relative to the parent marker; `SpotPath()` is relative to the
+  lane. Both return copied field-index paths. `ItemIndex()` gives the multi-spot
+  slice index, zero for single/optional spots, or -1 at the root. These describe
+  World storage, independently of the marker's `ApplicationPath()`.
+
+This slice requires a nonempty Course and a visitor. It does not provide crawling,
+descendant-search waypoints, movement controls, or live Application traversal.
 
 ## Live binding
 
@@ -142,8 +206,8 @@ I must be an interface; `Self` signature templates are not substituted into a
 runtime Go interface.
 
 Binding invokes no Application methods and does not traverse siblings or descendants.
-The caller owns invocation and its error handling. Course selection and cascading
-walking remain separate work.
+The caller owns invocation and its error handling. World Course selection can
+supply a marker to bind; cascading live Application walking remains separate work.
 
 ## Acceptance
 
