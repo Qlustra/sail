@@ -1,4 +1,4 @@
-// Package sail explores charts with user-authored legends, populates worlds from
+// Package sail compiles charts from user-authored legends, populates worlds from
 // application declarations, traverses connected World routes, and binds populated
 // markers to application values.
 // The declaration vocabulary lives in github.com/qlustra/sail/legend.

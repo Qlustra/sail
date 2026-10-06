@@ -8,7 +8,7 @@ Sail has two public packages in one module:
 | Import | Responsibility |
 | --- | --- |
 | `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated state. |
-| `github.com/qlustra/sail` | Operations: `Chart[L]`, `Explore`, `Populate`, Course-based World traversal, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
+| `github.com/qlustra/sail` | Operations: `Chart[L]`, `CompileLegend`, `Chart.Compile`, `Populate`, Course-based World traversal, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
 
 Declaration examples use `legend`:
 
@@ -23,7 +23,7 @@ type ProgramLegend struct {
 func (ProgramLegend) Mark() string { return "app" }
 ```
 
-Orchestration imports root `sail` for `sail.Explore[ProgramLegend]()` and
+Orchestration imports root `sail` for `sail.CompileLegend[ProgramLegend]()` and
 `sail.Populate[App](chart)`.
 
 The implementation is organized under `internal/`:
@@ -31,7 +31,7 @@ The implementation is organized under `internal/`:
 | Package | Responsibility |
 | --- | --- |
 | `declaration` | Canonical declaration carriers, populated state, application references, and the sealed access used by the engine. Public `legend` types alias these carriers. |
-| `engine` | Compiled descriptors, exploration, population, World navigation and route planning, and live binding through application references. |
+| `engine` | Compiled descriptors, compilation, population, World navigation and route planning, and live binding through application references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
 | `reflectutils` | Type inspection, field access, and receiver binding, independent of Sail's declaration model. |
@@ -52,7 +52,7 @@ such as Dome authors a **Legend**; a CLI authors an **Application**.
 | Term | Meaning |
 | --- | --- |
 | Legend | The framework's authored declaration, rooted in `legend.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
-| Chart | The reusable compiled descriptor graph produced by exploring with a Legend. Its Go type is `sail.Chart[L]`. |
+| Chart | The reusable compiled descriptor graph produced by compiling a Legend. Its Go type is `sail.Chart[L]`. |
 | Application | The consumer's Go declaration `A`, or a live instance of it. State which when the distinction matters. |
 | World | The populated `*L` describing a particular Application declaration. It holds marker occurrences and their metadata. |
 | Populated marker | A marker value representing a particular place in the Application declaration. |
@@ -64,7 +64,7 @@ its storage: `Populate` returns `*L`, not a separate `World[L]` wrapper.
 
 ```mermaid
 flowchart LR
-    L["Legend declaration L"] -->|"Explore[L]()"| C["Chart[L]: compiled descriptors"]
+    L["Legend declaration L"] -->|"CompileLegend[L]()"| C["Chart[L]: compiled descriptors"]
     C --> P["Populate[A](chart)"]
     A["Application declaration A"] --> P
     P --> W["World: populated *L"]
@@ -74,7 +74,7 @@ flowchart LR
     B --> R["Interface receiver I"]
 ```
 
-Exploration and population inspect declarations. Population invokes declared
+Compilation and population inspect declarations. Population invokes declared
 capabilities on zero-valued surrogates; it requires no live Application instance.
 World traversal resolves connected Courses using the Chart, then visits selected
 markers. Binding resolves a populated marker against existing Application storage.
@@ -82,7 +82,11 @@ Unrestricted crawling and live Application traversal remain future work.
 
 ## Population
 
-`Explore[L]()` builds a Chart with the Legend declaration L.
+`CompileLegend[L]()` builds a Chart with the Legend declaration L.
+To compile an existing `Chart[L]`, call `chart.Compile()`. Compilation validates
+declarations before replacing the Chart's descriptors; a failed compilation
+leaves an existing Chart unchanged.
+
 `Populate[A](chart)` returns a fresh World (`*L`) populated against **A's type**.
 The Chart holds reusable descriptors; populated markers hold metadata and
 Application references for individual occurrences. Markers expose
@@ -104,7 +108,7 @@ Single spots hold one marker in `Value`, optional spots hold a marker pointer
 or nil in `Value`, and multi spots hold a slice in `Value`. Repeated Application
 types are populated independently.
 Composite spot declarations must embed their spot carrier and intermediate
-wrappers by value. Exploration rejects pointer embeddings along that chain;
+wrappers by value. Compilation rejects pointer embeddings along that chain;
 `OptionalSpot.Value` still uses nil to represent an absent occurrence.
 An active cycle of the same marker and Application types is rejected because it
 would require an infinite expansion. Live Application binding remains separate.
@@ -235,9 +239,9 @@ func (EnumOptionLandmark) Accept() legend.Acceptance {
 }
 ```
 
-Exploration invokes `Accept` once per marker declaration type on its zero-valued
+Compilation invokes `Accept` once per marker declaration type on its zero-valued
 surrogate and records the compiled rule in its descriptor. Returning an empty `legend.Acceptance`, an invalid
-kind or contract, or panicking in the hook fails exploration. The declaration
+kind or contract, or panicking in the hook fails compilation. The declaration
 builders do not panic on invalid input. Without the hook, existing role
 requirements apply.
 
@@ -255,7 +259,7 @@ Each declaration selects one rule:
   declarations use their own method set. Direct `Self` parameters and results
   resolve to T, including when T is an interface. No surrogate is constructed
   and no Application method is invoked. Non-interface contracts and unsupported
-  `Self` signatures fail exploration. Barrels and qualities still require
+  `Self` signatures fail compilation. Barrels and qualities still require
   concrete receivers for invocation.
 
 Population checks acceptance before filling that occurrence's metadata,
@@ -287,7 +291,7 @@ func (CommandRegion) Family() string { return "command" }
 
 The capability must be an interface. Its selected method must be exported, take
 no arguments, and return exactly one value assignable to the barrel's value
-type. Exploration validates this contract before any World is populated.
+type. Compilation validates this contract before any World is populated.
 
 Omitting `barrel` means `barrel:"optional"`: an unavailable capability leaves
 the barrel empty. `barrel:"required"` instead makes absence a population error.
@@ -343,13 +347,13 @@ the qualities declared along their embedded `Qualifier` path.
 defined-type identity. It is a signature placeholder, not a Go interface that
 the Application type must literally implement. Sail checks the entire capability's
 method set. This slice supports Self directly in method parameters and results;
-compound uses such as `[]Self` and `*Self` fail exploration. Interfaces using
+compound uses such as `[]Self` and `*Self` fail compilation. Interfaces using
 Self must have exported methods. Ordinary interfaces use Go's implementation
 rules, including private methods.
 
 The selected `populate` method must be exported, take no arguments, and return
 one value. Fixed result types are checked for assignability to the storage type
-during exploration; Self results are checked during population. Self cannot be
+during compilation; Self results are checked during population. Self cannot be
 used as the storage type. With `any`, `arg.Default.Value.Get()` returns an
 interface containing the actual `Remote` value, not a converted string.
 
@@ -402,11 +406,11 @@ assigned to lanes:
 | Policy | Meaning |
 | --- | --- |
 | `eager` | Stay in the current lane while it accepts the field. |
-| `unambiguous` | Reject structural overlap between reachable lanes during exploration. |
+| `unambiguous` | Reject structural overlap between reachable lanes during compilation. |
 
 Omitting `exploration` selects `unambiguous`.
 
-Exploration rejects an unambiguous lane whose marks overlap a following lane
+Compilation rejects an unambiguous lane whose marks overlap a following lane
 reachable through zero-occurrence lanes. A lane permits zero occurrences only
 when every spot's minimum is zero. Lookahead includes the first required lane,
 then stops. Marks are compared by tag, family, and discriminants; features and

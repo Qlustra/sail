@@ -18,7 +18,7 @@ type BarrelShape struct {
 	Carrier    reflect.Type
 }
 
-// The sealed shape keeps both generic arguments available to exploration.
+// The sealed shape keeps both generic arguments available to compilation.
 // It does not dereference the receiver, including an embedded nil *Barrel.
 func (*Barrel[V, I]) barrel() BarrelShape {
 	return BarrelShape{

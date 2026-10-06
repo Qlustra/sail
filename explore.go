@@ -7,16 +7,16 @@ import (
 	"github.com/qlustra/sail/legend"
 )
 
-// Explore builds a chart with legend L, without an application declaration or instance.
-func Explore[L legend.Declaration]() (*Chart[L], error) {
+// CompileLegend builds a chart with legend L, without an application declaration or instance.
+func CompileLegend[L legend.Declaration]() (*Chart[L], error) {
 	chart := &Chart[L]{}
-	err := chart.Explore()
+	err := chart.Compile()
 	return chart, err
 }
 
-// Explore publishes a complete chart only after its declarations have been
-// validated. Failed exploration leaves an existing chart unchanged.
-func (c *Chart[L]) Explore() error {
+// Compile publishes a complete chart only after its declarations have been
+// validated. Failed compilation leaves an existing chart unchanged.
+func (c *Chart[L]) Compile() error {
 	compiled, err := engine.Explore(reflect.TypeFor[L]())
 	if err != nil {
 		return err

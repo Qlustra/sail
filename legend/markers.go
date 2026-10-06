@@ -1,10 +1,10 @@
-// Package legend provides the declaration vocabulary used to explore a Sail
+// Package legend provides the declaration vocabulary used to compile a Sail
 // Chart and the typed storage populated in a World.
 package legend
 
 import "github.com/qlustra/sail/internal/declaration"
 
-// Legend is embedded in the root declaration used to explore a Chart.
+// Legend is embedded in the root declaration used to compile a Chart.
 // Its populated value carries the World's reference to the Application root.
 type Legend = declaration.Legend
 

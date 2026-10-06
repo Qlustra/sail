@@ -9,7 +9,7 @@ import (
 )
 
 // lanePopulation owns the counts and destinations for one populated marker.
-// Both strategies consume forward: exploration already proved unambiguous
+// Both strategies consume forward: compilation already proved unambiguous
 // choices, while eager explicitly permits the current lane to take precedence.
 type lanePopulation struct {
 	descriptor   *markerDescriptor
