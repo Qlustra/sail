@@ -1,4 +1,4 @@
-package sail
+package chart
 
 import (
 	"fmt"
@@ -8,14 +8,15 @@ import (
 	"github.com/qlustra/sail/internal/engine"
 )
 
-// ChartTraversal selects a connected route through a populated Chart and processes
+// Traversal selects a connected route through a populated Chart and processes
 // its encounters. Course and Visit must each contain at least one entry.
-type ChartTraversal struct {
+type Traversal struct {
 	Course Course
 	Visit  Visitors
 }
 
-// Traverse resolves the entire Course against chart before invoking any visitor.
+// Traverse resolves the entire Course against the populated Chart before invoking
+// any visitor.
 // Every waypoint must select exactly one immediate child marker. The Legend root
 // anchors navigation but is not itself visited. Selected occurrences are visited
 // in route order, ending at the destination. Each encounter passes through every
@@ -25,7 +26,7 @@ type ChartTraversal struct {
 // planning and execution. Sail does not detect mutations. Callback panics
 // propagate; returned visitor errors retain their cause and encounter context.
 // This operation neither traverses a live Subject nor invokes its hooks.
-func (c *Charter[L]) Traverse(chart *L, traversal ChartTraversal) error {
+func Traverse(charter *engine.Charter, chart reflect.Value, traversal Traversal) error {
 	visitors := slices.Clone(traversal.Visit)
 	if err := visitors.validate(); err != nil {
 		return fmt.Errorf("sail: traverse: %w", err)
@@ -37,11 +38,7 @@ func (c *Charter[L]) Traverse(chart *L, traversal ChartTraversal) error {
 		}
 		course[i] = waypoint.selection
 	}
-	var compiled *engine.Charter
-	if c != nil {
-		compiled = c.compiled
-	}
-	plan, err := engine.PlanRoute(compiled, reflect.ValueOf(chart), course)
+	plan, err := engine.PlanRoute(charter, chart, course)
 	if err != nil {
 		return err
 	}

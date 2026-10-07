@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/qlustra/sail/chart"
 	"github.com/qlustra/sail/internal/engine"
 	"github.com/qlustra/sail/legend"
 )
@@ -48,7 +49,7 @@ func Materialize[S any, L legend.Declaration](charter *Charter[L], chart *L, sub
 
 // Traverse follows a Course through the Vessel's Chart. Visitors receive
 // populated markers; traversal does not walk or invoke the live Subject.
-func (v *Vessel[S, L]) Traverse(traversal ChartTraversal) error {
+func (v *Vessel[S, L]) Traverse(traversal chart.Traversal) error {
 	if v == nil {
 		return fmt.Errorf("sail: traverse requires a Vessel")
 	}

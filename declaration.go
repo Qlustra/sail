@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/qlustra/sail/internal/capability"
+	"github.com/qlustra/sail/internal/reflectutils"
 )
 
 // ReadCapability invokes a declaration method on a fresh zero-valued surrogate
@@ -39,4 +40,12 @@ func ReadCapability[V, I any](carrierType reflect.Type, method string) (value V,
 	// Preserve nil interface results and the compiled assignability contract.
 	reflect.ValueOf(&value).Elem().Set(result)
 	return value, true, nil
+}
+
+// ResolvePointerChain returns the first non-pointer type in typ's pointer
+// chain, preserving defined-type identity. Nil input and cyclic pointer chains
+// return nil. Interface types remain interfaces; resolving them would require
+// a live value.
+func ResolvePointerChain(typ reflect.Type) reflect.Type {
+	return reflectutils.ResolvePointerChain(typ)
 }

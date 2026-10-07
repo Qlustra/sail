@@ -3,12 +3,13 @@ Sail
 
 ## Packages
 
-Sail has two public packages in one module:
+Sail has three public packages in one module:
 
 | Import | Responsibility |
 | --- | --- |
 | `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated Chart state. |
-| `github.com/qlustra/sail` | Operations: `Charter[L]`, `CompileLegend`, `Charter.Compile`, `Populate`, `Vessel[S, L]`, `Materialize`, Course-based Chart traversal, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
+| `github.com/qlustra/sail/chart` | Chart capabilities: `Course`, `Waypoint`, `Select`, `Traversal`, `Encounter`, `Visitor`, `Visitors`, `On`, and `Visit`. |
+| `github.com/qlustra/sail` | Lifecycle entry points and holders: `Charter[L]`, `CompileLegend`, `Charter.Compile`, `Populate`, `Charter.Traverse`, `Vessel[S, L]`, `Materialize`, `Vessel.Traverse`, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
 
 Declaration examples use `legend`:
 
@@ -27,15 +28,23 @@ Orchestration imports root `sail`:
 
 ```go
 charter, err := sail.CompileLegend[TreeLegend]()
-chart, err := sail.Populate[Tree](charter)
-vessel, err := sail.Materialize[Tree](charter, chart)
+populated, err := sail.Populate[Tree](charter)
+vessel, err := sail.Materialize[Tree](charter, populated)
 ```
+
+Root implementation files follow those responsibilities: `charter.go` contains
+the Charter and its compilation, population, and traversal entry points;
+`vessel.go` contains the Vessel and materialization; `bind.go` handles live
+binding; `declaration.go` contains the static declaration utilities. Chart
+navigation types belong to `chart`, while authored declarations belong to
+`legend`. Live Subject propagation remains future work.
 
 The implementation is organized under `internal/`:
 
 | Package | Responsibility |
 | --- | --- |
 | `declaration` | Canonical declaration types, populated Chart state, carrier references, and the sealed access used by the engine. Public `legend` types alias these types. |
+| `chart` | Canonical Course, Waypoint, Encounter, visitor, and Traversal types, plus Chart traversal execution. Public `chart` types alias these types and its generic helpers forward here. |
 | `engine` | Compiled descriptors, compilation, population, Chart navigation and route planning, Vessel association checks, and live binding through carrier references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
@@ -43,8 +52,9 @@ The implementation is organized under `internal/`:
 
 `Charter[L]` keeps compiled descriptors private. Public `legend` types alias
 canonical internal declaration types, so reflection reports those canonical type
-names. The aliases retain the sealed protocols used for inspection and population
-without exposing those operations in the public declaration API.
+names. Public `chart` aliases likewise retain the private state shared by
+selectors, encounters, and traversal execution. These arrangements keep internal
+cooperation out of the public APIs.
 
 ## Vocabulary and lifecycle
 
@@ -81,7 +91,7 @@ flowchart LR
     C --> P["Populate[S](charter)"]
     S["Subject declaration S"] --> P
     P --> T["Chart: populated *L"]
-    C --> M["Materialize(charter, chart, subject)"]
+    C --> M["Materialize(charter, populated, subject)"]
     T --> M
     I["Live Subject instance *S"] --> M
     M --> V["Vessel[S, L]"]
@@ -92,7 +102,8 @@ flowchart LR
 
 Compilation and population inspect declarations. Population invokes declared
 capabilities on zero-valued surrogates; it requires no live Subject instance.
-Chart traversal resolves connected Courses using the Charter, then visits
+Chart traversal uses the `chart` package's connected Courses and visitors through
+the Charter's traversal entry point. It resolves the Course, then visits
 selected markers. Binding resolves a populated marker against an existing
 Subject. Materialization associates the Charter and Chart with a live Subject.
 Unrestricted crawling and live Subject traversal remain future work.
@@ -134,16 +145,16 @@ would require an infinite expansion. Live Subject binding remains separate.
 
 ## Materialization
 
-`Materialize[S](charter, chart)` creates a Vessel with a fresh zero-valued Subject
+`Materialize[S](charter, populated)` creates a Vessel with a fresh zero-valued Subject
 allocated by `new(S)`. To retain an existing Subject, supply its
 pointer as the final argument; both generic parameters can then be inferred:
 
 ```go
-fresh, err := sail.Materialize[Tree](charter, chart)
+fresh, err := sail.Materialize[Tree](charter, populated)
 
 // One Subject can be shared by Vessels using different Legends.
 tree := &Tree{}
-attached, err := sail.Materialize(charter, chart, tree)
+attached, err := sail.Materialize(charter, populated, tree)
 ```
 
 The variadic tail represents one optional Subject. More than one pointer and an
@@ -159,25 +170,29 @@ composition. If S is itself a pointer type, fresh `new(S)` leaves its pointee
 nil, which is an invalid Subject root. Frameworks construct
 and configure their own state before or after materialization as appropriate.
 
-`vessel.Traverse(traversal)` forwards Chart traversal to the retained Charter and
-Chart. Visitors receive populated markers; this is not live Subject walking.
+`vessel.Traverse(traversal)` accepts `chart.Traversal` and forwards Chart traversal
+to the retained Charter and Chart. Visitors receive populated markers; this is
+not live Subject walking.
 
 ## Chart traversal
 
-A **Course** is a reusable sequence of **Waypoints**. Each waypoint selects
-exactly one immediate child marker, starting at the Chart root:
+A **Course** is a reusable sequence of **Waypoints**. The `chart` package owns
+navigation over populated Charts. Each waypoint selects exactly one immediate
+child marker, starting at the Chart root:
 
 ```go
-course := sail.Course{
-    sail.Select[*CommandRegion](),
-    sail.Select(func(command *CommandRegion) bool {
+import "github.com/qlustra/sail/chart"
+
+course := chart.Course{
+    chart.Select[*CommandRegion](),
+    chart.Select(func(command *CommandRegion) bool {
         return command.Name.Get() == "validate"
     }),
 }
 
-err := charter.Traverse(chart, sail.ChartTraversal{
+err := charter.Traverse(populated, chart.Traversal{
     Course: course,
-    Visit: sail.Visit(func(command *CommandRegion, encounter sail.Encounter) error {
+    Visit: chart.Visit(func(command *CommandRegion, encounter chart.Encounter) error {
         fmt.Println(encounter.Depth(), command.Name.Get(), encounter.Destination())
         return nil
     }),
@@ -202,14 +217,15 @@ receive a pointer to that copy. Nested pointers, slices, and maps retain normal
 Go sharing semantics. Predicates must be read-only; Sail does not deep-copy the
 Chart or detect mutations. Interface adaptation prefers the marker's pointer.
 
-`ChartTraversal.Visit` always holds a `sail.Visitors` list. `Visit[T]` constructs a
-single-item list; `On[T]` constructs one visitor for composing a list:
+`chart.Traversal.Visit` always holds a `chart.Visitors` list. `chart.Visit[T]`
+constructs a single-item list; `chart.On[T]` constructs one visitor for composing
+a list:
 
 ```go
-Visit: sail.Visitors{
-    sail.On(inspectCommand),
-    sail.On(inspectFlagBag),
-    sail.On(inspectFlag),
+Visit: chart.Visitors{
+    chart.On(inspectCommand),
+    chart.On(inspectFlagBag),
+    chart.On(inspectFlag),
 },
 ```
 
@@ -247,7 +263,7 @@ descendant-search waypoints, movement controls, or live Subject traversal.
 returns an ordinary Go interface receiver:
 
 ```go
-command := &chart.EntryPoint.MainCommand.Value
+command := &populated.EntryPoint.MainCommand.Value
 receiver, present, err := sail.Bind[Runnable](&program, command)
 if err != nil {
 	return err

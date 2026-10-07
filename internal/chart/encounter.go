@@ -1,4 +1,4 @@
-package sail
+package chart
 
 import (
 	"slices"

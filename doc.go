@@ -1,6 +1,7 @@
 // Package sail compiles Charters from user-authored Legends, populates Charts
 // from Subject declarations, and materializes Vessels holding live Subjects.
-// It traverses connected Chart routes and binds populated markers to their live
+// Charter and Vessel traversal entry points accept configurations from
+// github.com/qlustra/sail/chart. Bind connects populated markers to their live
 // carriers: Subject fields, or the Subject root for the root Legend.
-// The declaration vocabulary lives in github.com/qlustra/sail/legend.
+// Authored declaration vocabulary lives in github.com/qlustra/sail/legend.
 package sail
