@@ -9,7 +9,7 @@ Sail has four public packages in one module:
 | --- | --- |
 | `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated Chart state. |
 | `github.com/qlustra/sail/chart` | Chart capabilities: `Course`, `Waypoint`, `Select`, `Traversal`, `Encounter`, `Visitor`, `Visitors`, `On`, and `Visit`. |
-| `github.com/qlustra/sail/subject` | Live Subject propagation: `Propagation`, `Interceptors`, `Interceptor`, `Intercept`, `Flow`, and `Encounter`. |
+| `github.com/qlustra/sail/subject` | Live Subject propagation: `Propagation`, `Interceptor`, `Intercept`, `Order`, `Route`, movement constructors, `Encounter`, `Identity`, `Enterable`, `Children`, and `Iterate`. |
 | `github.com/qlustra/sail` | Lifecycle entry points and holders: `Charter[L]`, `CompileLegend`, `Charter.Compile`, `Populate`, `Charter.Traverse`, `Vessel[S, L]`, `Materialize`, `Vessel.Traverse`, `Vessel.Propagate`, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
 
 Declaration examples use `legend`:
@@ -46,7 +46,7 @@ The implementation is organized under `internal/`:
 | --- | --- |
 | `declaration` | Canonical declaration types, populated Chart state, carrier references, and the sealed access used by the engine. Public `legend` types alias these types. |
 | `chart` | Canonical Course, Waypoint, Encounter, visitor, and Traversal types, plus Chart traversal execution. Public `chart` types alias these types and its generic helpers forward here. |
-| `subject` | Canonical Propagation, interceptor, Flow, and Encounter types, plus live propagation execution. Public `subject` types alias these types and its generic helper forwards here. |
+| `subject` | Canonical propagation, interceptor, routing, encounter, identity, and member-entry types, plus live propagation execution. Public `subject` types alias these types and its constructors forward here. |
 | `engine` | Compiled descriptors, compilation, population, Chart navigation and route planning, Vessel association checks, and live binding through carrier references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
@@ -179,8 +179,9 @@ and configure their own state before or after materialization as appropriate.
 to the retained Charter and Chart. Visitors receive populated markers; this is
 not live Subject walking.
 
-`vessel.Propagate(propagation)` accepts `subject.Propagation` and walks the
-retained live Subject using the Charter and populated Chart.
+`vessel.Propagate(order, propagation)` accepts an explicit `subject.Order` and a
+`subject.Propagation` interceptor list. It walks the retained live Subject using
+the Charter and populated Chart.
 
 ## Chart traversal
 
@@ -268,86 +269,185 @@ propagation has its own callbacks and movement decisions.
 
 ## Subject propagation
 
-Propagation walks the live Subject's participating carriers in preorder,
-depth-first order. The populated Chart supplies participation and topology;
-interceptors supply operations and movement decisions:
+Propagation visits the live Subject's participating carriers. The populated
+Chart supplies participation and declared topology; interceptors supply
+operations, movement, and local visit order:
 
 ```go
 import "github.com/qlustra/sail/subject"
 
-err := vessel.Propagate(subject.Propagation{
-    Interceptors: subject.Interceptors{
-        subject.Intercept[DeepLoader](
-            func(node DeepLoader, at subject.Encounter) (subject.Flow, error) {
-                _, err := node.LoadDeep(ctx)
-                return subject.Prune, err
-            },
-        ),
-        subject.Intercept[Loadable](
-            func(node Loadable, at subject.Encounter) (subject.Flow, error) {
-                _, err := node.Load()
-                return subject.Descend, err
-            },
-        ),
-    },
+err := vessel.Propagate(subject.DepthFirst, subject.Propagation{
+    subject.Intercept[DeepLoader](
+        func(node DeepLoader, at subject.Encounter) (subject.Route, error) {
+            if _, err := node.LoadDeep(ctx); err != nil {
+                return subject.Abort(err)
+            }
+            return subject.Prune(), nil
+        },
+    ),
+    subject.Intercept[Loadable](
+        func(node Loadable, at subject.Encounter) (subject.Route, error) {
+            if _, err := node.Load(); err != nil {
+                return subject.Abort(err)
+            }
+            return subject.Descend(subject.DepthFirst), nil
+        },
+    ),
 })
 ```
 
 The root Legend represents the Subject root and is visited at depth zero.
-Children follow the Chart's lane order and the Subject's declaration order
-across spot kinds. Optional spots without a value and empty multi spots produce
-no child occurrences. Propagation follows only this recorded topology; it does
-not discover unmarked fields or enumerate live collection contents.
+Declared children follow the Chart's lane order and the Subject's declaration
+order across spot kinds. Optional spots without a value and empty multi spots
+produce no child occurrences. Untagged fields, including Go embeddings, remain
+outside the topology. Interfaces route operations after a participant is reached;
+they do not establish participation.
 
 `Intercept[I]` requires an ordinary Go interface contract. Each occurrence tries
 registrations in order, binding its current live carrier to I. Unmatched contracts
 pass automatically. The first accepting callback controls movement:
 
-| Flow | Effect |
+| Route | Effect |
 | --- | --- |
-| `Pass` | Decline this registration and try the next interceptor. |
-| `Descend` | Accept the occurrence and visit its children. |
-| `Prune` | Accept the occurrence, skip its children, and continue siblings. |
-| `Stop` | Finish the whole propagation successfully. |
+| `Pass()` | Decline this registration and try the next interceptor. |
+| `Descend(order)` | Accept the occurrence and visit its children in the explicit order. |
+| `Prune()` | Accept the occurrence, skip its children, and continue siblings. |
+| `Stop()` | Finish the whole propagation successfully. |
+| `Abort(err)` | Return a stopping route and the original error for direct forwarding. |
 
-When every interceptor passes or none matches, Sail descends. An empty list is
-valid and follows this default throughout. Registrations are copied on entry.
+When every interceptor passes or none matches, Sail descends using the enclosing
+scope's order. An empty list is valid and follows the explicitly chosen initial
+order throughout. Registrations are copied on entry.
 Unregistered zero interceptors, invalid interface contracts, and nil callbacks
 fail before any handler runs.
+
+Initial and local orders must be `DepthFirst` or `BreadthFirst`; the zero value
+is invalid. Depth-first completes each branch before its next sibling.
+Breadth-first reaches siblings before their descendants. An accepted route's
+local order governs its descendant scope. A different order finishes that scope
+before the enclosing walk resumes. For example, a breadth-first root with
+children A and B normally visits `root, A, B, A1, A2`; if A chooses depth-first,
+the sequence becomes `root, A, A1, A2, B`.
+
+`Descend` accepts at most one optional completion callback:
+
+```go
+return subject.Descend(subject.BreadthFirst, func() error {
+    return node.Wrapup(ctx)
+}), nil
+```
+
+Completion runs after every child scope has succeeded, even during breadth-first
+propagation. It can retain the accepted receiver and local state through its
+closure. `Stop`, returned errors, and panics cancel pending completions;
+completion is successful wrapup rather than failure cleanup. Passing nil means
+no completion callback. Invalid order and extra completion arguments are reported
+by propagation rather than panicking in the constructor.
 
 Binding uses the existing Subject values and happens when each registration is
 reached. A callback can change Subject state before returning `Pass`; the next
 registration binds again. A parent can initialize or replace a child before
-returning `Descend`. Pruned branches never need binding. Sail does not allocate
-Subject values, construct addressable receiver copies, or invoke Subject methods
-itself. Ordinary Go receiver semantics still apply to interface fields holding
-concrete non-pointer values.
+returning `Descend`. Sail refreshes the carrier and its identity again before
+descent. Pruned branches never need binding. Sail does not allocate live Subject
+values or construct addressable receiver copies. Ordinary Go receiver semantics
+still apply to interface fields holding concrete non-pointer values.
 
 Nil pointer and interface branches are skipped, including interfaces containing
 typed nil pointers. Nil maps and slices remain valid receivers. Propagation
 validates a nonnil Subject root before callbacks; wrong roots and inaccessible
-or cyclic receivers are errors. Propagation leaves `Bind`'s strict nil handling
-unchanged.
+receivers are errors. Propagation leaves `Bind`'s strict nil handling unchanged.
+
+### Entered members
+
+A reached carrier may implement `subject.Enterable` to supply additional live
+children. Its `Enter` method returns opaque `Children` constructed with the
+typed `Iterate` helper:
+
+```go
+func (s *Slot[T]) Enter() (subject.Children, error) {
+    return subject.Iterate(s.All()), nil
+}
+```
+
+`All` supplies `iter.Seq2[K, T]`: keys identify members in diagnostics, and source
+order determines member order. `Iterate` retains the declared T even for an empty
+source. Sail interprets that type through the current Charter's Legend and reuses
+its populated member Chart during this propagation. Member roots join the same
+walk with the collection encounter as parent, continuous depth, and the same
+interceptors. The source owns discovery, composition, and caching.
+
+`Enter` runs after interceptors permit descent; `Prune` bypasses it. Declared
+children precede entered members in the child sequence. Enumeration stays lazy
+and honors iterator early termination when propagation stops or fails. `Enter`
+may return a setup error; ordinary `iter.Seq2` has no later error channel. Nil
+iterators and zero `Children` are invalid. Declared member types must satisfy
+Legend population, including its struct-root requirement; interface-declared
+members are not populated through dynamic type discovery.
+
+Pointer members retain their actual storage. Yielded values remain value copies,
+without fabricated addressability; their real pointer fields still lead to live
+state. A pointer-only contract on an unaddressable yielded value fails with the
+ordinary receiver-binding error. Nil pointer members are skipped.
+
+### Identity and cycles
+
+Sail records reliable receiver identity per propagation. Shared instances remain
+separate occurrences and can receive the same operation through several routes.
+The encounter exposes `First()` for first-arrival work and `Cycle()` for a return
+to an ancestor on this route:
+
+```go
+if at.First() {
+    if err := node.Setup(ctx); err != nil {
+        return subject.Abort(err)
+    }
+}
+if _, cyclic := at.Cycle(); cyclic {
+    return subject.Prune(), nil
+}
+return subject.Descend(subject.DepthFirst), nil
+```
+
+`First` describes arrival history, not whether any operation ran or succeeded.
+Rebinding the same receiver after `Pass` preserves that encounter's original
+first-arrival fact. A replacement receiver gets its own identity and history.
+`Identity()` is opaque and comparable within this propagation, for callers who
+need additional bookkeeping. Value members identify their yielded occurrences,
+not objects in an external cache.
+
+A cyclic arrival is offered to interceptors so callers can perform work and
+choose `Prune`, `Stop`, or an error. Sail rejects descent while the cycle remains
+closed, including automatic descent after all interceptors pass. Cycle detection
+follows the encounter's logical ancestry regardless of visit order; shared
+receivers in other branches are not cycles. An ancestor scope retains the receiver
+bound when its descent began. Later field replacements affect future arrivals,
+without reassigning that scope or its pending completion. Identity is established on arrival
+and refreshed during rebinding and before descent. Ambiguous identity is rejected
+rather than guessed. Inline zero-sized fields use their containing receiver and
+field provenance; pointers to zero-sized targets are rejected because Go may
+assign distinct targets the same address. The explicitly supplied root has known
+invocation provenance. No preflight of live instance edges is performed.
 
 The Chart's topology must remain stable throughout propagation; live Subject
 state may change. Callbacks own their operations, context, and method calls.
 Returned errors stop propagation, retaining the cause with occurrence and
-interceptor context. Returning an unknown Flow is also an error. Callback panics
-propagate normally. A `subject.Encounter` reports the occurrence independently of
-Chart Course selection:
+interceptor, entry, or completion context. Callback panics propagate normally.
+There is no error-recovery or accumulation policy. A `subject.Encounter` reports
+the occurrence independently of Chart Course selection:
 
 - `Marker()` returns the populated marker pointer; `Parent()` returns the parent
   encounter and a presence flag. The root has no parent.
 - `Depth()` counts marker edges from the root; `Source()` identifies the carrier
-  location for diagnostics.
+  location, including entered member keys, for diagnostics.
 - `CarrierType()` gives the original declared carrier type; `CarrierPath()` gives
-  its field-index path from the Subject root.
+  its field-index path from the Subject or entered member root.
 - `LanePath()` is relative to the parent marker; `SpotPath()` is relative to its
   lane. `ItemIndex()` gives the multi-spot index, zero for single/optional spots,
-  or -1 at the root. All path accessors return defensive copies.
+  or -1 at a root. All path accessors return defensive copies.
+- `First()`, `Cycle()`, and `Identity()` report this arrival's identity facts.
 
-This slice does not provide Courses, breadth-first order, or supplied dynamic
-child traversals for Subject propagation.
+Subject propagation does not use Chart Courses. Local routing and typed member
+entry operate on the participating live topology.
 
 ## Live binding
 

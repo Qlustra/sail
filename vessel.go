@@ -58,17 +58,16 @@ func (v *Vessel[S, L]) Traverse(traversal chart.Traversal) error {
 	return v.charter.Traverse(v.chart, traversal)
 }
 
-// Propagate visits the live Subject root and its participating carriers in
-// preorder, following the populated Chart. Interceptors bind existing receivers
-// and control descent; nil pointer and interface branches are skipped. The live
-// root and registrations are checked before callbacks, and registrations are
-// copied on entry. An empty list descends without invoking callbacks.
+// Propagate visits the live Subject using an explicit initial order. Interceptors
+// bind existing receivers and choose local descent order, pruning, or stopping.
+// Enterable carriers supply typed members interpreted through this Vessel's
+// Legend. Nil branches are skipped; Chart topology must remain stable.
 //
-// Handlers may change Subject state, including initializing children before
-// descending. Chart topology must remain stable. Sail allocates no Subject
-// values and invokes only the supplied callbacks. Callback panics propagate;
-// returned errors retain their cause with occurrence and interceptor context.
-func (v *Vessel[S, L]) Propagate(propagation subject.Propagation) error {
+// Shared receivers are offered on each arrival. First identifies the first
+// arrival, and Cycle identifies a return to an ancestor. Cyclic arrivals may be
+// handled, but descent into a cycle fails. Errors stop immediately and retain
+// their cause and source; Stop, errors, and panics cancel pending completions.
+func (v *Vessel[S, L]) Propagate(order subject.Order, propagation subject.Propagation) error {
 	if v == nil {
 		return fmt.Errorf("sail: propagate requires a Vessel")
 	}
@@ -76,5 +75,5 @@ func (v *Vessel[S, L]) Propagate(propagation subject.Propagation) error {
 	if v.charter != nil {
 		compiled = v.charter.compiled
 	}
-	return subjectcore.Propagate(compiled, reflect.ValueOf(v.chart), v.Subject, propagation)
+	return subjectcore.Propagate(compiled, reflect.ValueOf(v.chart), v.Subject, order, propagation)
 }
