@@ -6,7 +6,9 @@ import (
 
 	"github.com/qlustra/sail/chart"
 	"github.com/qlustra/sail/internal/engine"
+	subjectcore "github.com/qlustra/sail/internal/subject"
 	"github.com/qlustra/sail/legend"
+	"github.com/qlustra/sail/subject"
 )
 
 // Vessel associates a compiled Charter and populated Chart with a live Subject.
@@ -54,4 +56,25 @@ func (v *Vessel[S, L]) Traverse(traversal chart.Traversal) error {
 		return fmt.Errorf("sail: traverse requires a Vessel")
 	}
 	return v.charter.Traverse(v.chart, traversal)
+}
+
+// Propagate visits the live Subject root and its participating carriers in
+// preorder, following the populated Chart. Interceptors bind existing receivers
+// and control descent; nil pointer and interface branches are skipped. The live
+// root and registrations are checked before callbacks, and registrations are
+// copied on entry. An empty list descends without invoking callbacks.
+//
+// Handlers may change Subject state, including initializing children before
+// descending. Chart topology must remain stable. Sail allocates no Subject
+// values and invokes only the supplied callbacks. Callback panics propagate;
+// returned errors retain their cause with occurrence and interceptor context.
+func (v *Vessel[S, L]) Propagate(propagation subject.Propagation) error {
+	if v == nil {
+		return fmt.Errorf("sail: propagate requires a Vessel")
+	}
+	var compiled *engine.Charter
+	if v.charter != nil {
+		compiled = v.charter.compiled
+	}
+	return subjectcore.Propagate(compiled, reflect.ValueOf(v.chart), v.Subject, propagation)
 }

@@ -3,13 +3,14 @@ Sail
 
 ## Packages
 
-Sail has three public packages in one module:
+Sail has four public packages in one module:
 
 | Import | Responsibility |
 | --- | --- |
 | `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated Chart state. |
 | `github.com/qlustra/sail/chart` | Chart capabilities: `Course`, `Waypoint`, `Select`, `Traversal`, `Encounter`, `Visitor`, `Visitors`, `On`, and `Visit`. |
-| `github.com/qlustra/sail` | Lifecycle entry points and holders: `Charter[L]`, `CompileLegend`, `Charter.Compile`, `Populate`, `Charter.Traverse`, `Vessel[S, L]`, `Materialize`, `Vessel.Traverse`, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
+| `github.com/qlustra/sail/subject` | Live Subject propagation: `Propagation`, `Interceptors`, `Interceptor`, `Intercept`, `Flow`, and `Encounter`. |
+| `github.com/qlustra/sail` | Lifecycle entry points and holders: `Charter[L]`, `CompileLegend`, `Charter.Compile`, `Populate`, `Charter.Traverse`, `Vessel[S, L]`, `Materialize`, `Vessel.Traverse`, `Vessel.Propagate`, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
 
 Declaration examples use `legend`:
 
@@ -34,10 +35,10 @@ vessel, err := sail.Materialize[Tree](charter, populated)
 
 Root implementation files follow those responsibilities: `charter.go` contains
 the Charter and its compilation, population, and traversal entry points;
-`vessel.go` contains the Vessel and materialization; `bind.go` handles live
-binding; `declaration.go` contains the static declaration utilities. Chart
-navigation types belong to `chart`, while authored declarations belong to
-`legend`. Live Subject propagation remains future work.
+`vessel.go` contains the Vessel, materialization, and propagation entry point;
+`bind.go` handles live binding; `declaration.go` contains the static declaration
+utilities. Chart navigation types belong to `chart`, live propagation types to
+`subject`, and authored declarations to `legend`.
 
 The implementation is organized under `internal/`:
 
@@ -45,6 +46,7 @@ The implementation is organized under `internal/`:
 | --- | --- |
 | `declaration` | Canonical declaration types, populated Chart state, carrier references, and the sealed access used by the engine. Public `legend` types alias these types. |
 | `chart` | Canonical Course, Waypoint, Encounter, visitor, and Traversal types, plus Chart traversal execution. Public `chart` types alias these types and its generic helpers forward here. |
+| `subject` | Canonical Propagation, interceptor, Flow, and Encounter types, plus live propagation execution. Public `subject` types alias these types and its generic helper forwards here. |
 | `engine` | Compiled descriptors, compilation, population, Chart navigation and route planning, Vessel association checks, and live binding through carrier references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
@@ -52,9 +54,9 @@ The implementation is organized under `internal/`:
 
 `Charter[L]` keeps compiled descriptors private. Public `legend` types alias
 canonical internal declaration types, so reflection reports those canonical type
-names. Public `chart` aliases likewise retain the private state shared by
-selectors, encounters, and traversal execution. These arrangements keep internal
-cooperation out of the public APIs.
+names. Public `chart` and `subject` aliases likewise retain the private state
+shared by registrations, encounters, and their respective traversal execution.
+These arrangements keep internal cooperation out of the public APIs.
 
 ## Vocabulary and lifecycle
 
@@ -98,6 +100,8 @@ flowchart LR
     T --> B["Bind[I](subject, marker)"]
     I --> B
     B --> R["Interface receiver I"]
+    V --> W["Propagate: visit live carriers"]
+    W --> H["Framework-owned interceptor callbacks"]
 ```
 
 Compilation and population inspect declarations. Population invokes declared
@@ -106,7 +110,8 @@ Chart traversal uses the `chart` package's connected Courses and visitors throug
 the Charter's traversal entry point. It resolves the Course, then visits
 selected markers. Binding resolves a populated marker against an existing
 Subject. Materialization associates the Charter and Chart with a live Subject.
-Unrestricted crawling and live Subject traversal remain future work.
+Subject propagation uses that association to visit live carriers, with framework
+callbacks controlling movement. Unrestricted Chart crawling remains future work.
 
 ## Population
 
@@ -173,6 +178,9 @@ and configure their own state before or after materialization as appropriate.
 `vessel.Traverse(traversal)` accepts `chart.Traversal` and forwards Chart traversal
 to the retained Charter and Chart. Visitors receive populated markers; this is
 not live Subject walking.
+
+`vessel.Propagate(propagation)` accepts `subject.Propagation` and walks the
+retained live Subject using the Charter and populated Chart.
 
 ## Chart traversal
 
@@ -254,8 +262,92 @@ An **Encounter** records the arrival and its route context:
   slice index, zero for single/optional spots, or -1 at the root. These describe
   positions in the Chart, independently of the marker's `CarrierPath()`.
 
-This slice requires a nonempty Course and visitor list. It does not provide crawling,
-descendant-search waypoints, movement controls, or live Subject traversal.
+Chart traversal requires a nonempty Course and visitor list. It does not provide
+crawling, descendant-search waypoints, or movement controls. Live Subject
+propagation has its own callbacks and movement decisions.
+
+## Subject propagation
+
+Propagation walks the live Subject's participating carriers in preorder,
+depth-first order. The populated Chart supplies participation and topology;
+interceptors supply operations and movement decisions:
+
+```go
+import "github.com/qlustra/sail/subject"
+
+err := vessel.Propagate(subject.Propagation{
+    Interceptors: subject.Interceptors{
+        subject.Intercept[DeepLoader](
+            func(node DeepLoader, at subject.Encounter) (subject.Flow, error) {
+                _, err := node.LoadDeep(ctx)
+                return subject.Prune, err
+            },
+        ),
+        subject.Intercept[Loadable](
+            func(node Loadable, at subject.Encounter) (subject.Flow, error) {
+                _, err := node.Load()
+                return subject.Descend, err
+            },
+        ),
+    },
+})
+```
+
+The root Legend represents the Subject root and is visited at depth zero.
+Children follow the Chart's lane order and the Subject's declaration order
+across spot kinds. Optional spots without a value and empty multi spots produce
+no child occurrences. Propagation follows only this recorded topology; it does
+not discover unmarked fields or enumerate live collection contents.
+
+`Intercept[I]` requires an ordinary Go interface contract. Each occurrence tries
+registrations in order, binding its current live carrier to I. Unmatched contracts
+pass automatically. The first accepting callback controls movement:
+
+| Flow | Effect |
+| --- | --- |
+| `Pass` | Decline this registration and try the next interceptor. |
+| `Descend` | Accept the occurrence and visit its children. |
+| `Prune` | Accept the occurrence, skip its children, and continue siblings. |
+| `Stop` | Finish the whole propagation successfully. |
+
+When every interceptor passes or none matches, Sail descends. An empty list is
+valid and follows this default throughout. Registrations are copied on entry.
+Unregistered zero interceptors, invalid interface contracts, and nil callbacks
+fail before any handler runs.
+
+Binding uses the existing Subject values and happens when each registration is
+reached. A callback can change Subject state before returning `Pass`; the next
+registration binds again. A parent can initialize or replace a child before
+returning `Descend`. Pruned branches never need binding. Sail does not allocate
+Subject values, construct addressable receiver copies, or invoke Subject methods
+itself. Ordinary Go receiver semantics still apply to interface fields holding
+concrete non-pointer values.
+
+Nil pointer and interface branches are skipped, including interfaces containing
+typed nil pointers. Nil maps and slices remain valid receivers. Propagation
+validates a nonnil Subject root before callbacks; wrong roots and inaccessible
+or cyclic receivers are errors. Propagation leaves `Bind`'s strict nil handling
+unchanged.
+
+The Chart's topology must remain stable throughout propagation; live Subject
+state may change. Callbacks own their operations, context, and method calls.
+Returned errors stop propagation, retaining the cause with occurrence and
+interceptor context. Returning an unknown Flow is also an error. Callback panics
+propagate normally. A `subject.Encounter` reports the occurrence independently of
+Chart Course selection:
+
+- `Marker()` returns the populated marker pointer; `Parent()` returns the parent
+  encounter and a presence flag. The root has no parent.
+- `Depth()` counts marker edges from the root; `Source()` identifies the carrier
+  location for diagnostics.
+- `CarrierType()` gives the original declared carrier type; `CarrierPath()` gives
+  its field-index path from the Subject root.
+- `LanePath()` is relative to the parent marker; `SpotPath()` is relative to its
+  lane. `ItemIndex()` gives the multi-spot index, zero for single/optional spots,
+  or -1 at the root. All path accessors return defensive copies.
+
+This slice does not provide Courses, breadth-first order, or supplied dynamic
+child traversals for Subject propagation.
 
 ## Live binding
 
@@ -292,7 +384,8 @@ runtime Go interface.
 
 Binding invokes no Subject methods and does not traverse siblings or descendants.
 The caller owns invocation and its error handling. Chart Course selection can
-supply a marker to bind; cascading live Subject walking remains separate work.
+supply a marker to bind; Subject propagation uses the same receiver semantics
+while adding nil-branch skipping and movement control.
 
 ## Acceptance
 
