@@ -20,8 +20,8 @@ const (
 )
 
 // A markerDescriptor records the rules of a reusable marker declaration.
-// Lane and spot descriptors arrange its children; application metadata belongs
-// to populated markers in a world.
+// Lane and spot descriptors arrange its children; subject metadata belongs
+// to populated markers in a chart.
 type markerDescriptor struct {
 	typ         reflect.Type
 	role        markerRole

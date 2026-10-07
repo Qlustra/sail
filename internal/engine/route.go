@@ -14,16 +14,16 @@ type Waypoint struct {
 }
 
 // RoutePlan contains only selected markers, in Course order. The first marker's
-// Parent retains the World root so processors can inspect the complete route.
+// Parent retains the Chart root so processors can inspect the complete route.
 type RoutePlan struct {
 	Occurrences []*Occurrence
 }
 
 // PlanRoute resolves the whole Course before any processor can run. Selectors
-// inspect existing World values; traversal itself performs no allocations into
-// the World and invokes no Application hooks.
-func PlanRoute(chart *Chart, world reflect.Value, course []Waypoint) (*RoutePlan, error) {
-	parent, err := navigationRoot(chart, world)
+// inspect existing Chart values; traversal itself performs no allocations into
+// the Chart and invokes no Subject hooks.
+func PlanRoute(charter *Charter, chart reflect.Value, course []Waypoint) (*RoutePlan, error) {
+	parent, err := navigationRoot(charter, chart)
 	if err != nil {
 		return nil, err
 	}

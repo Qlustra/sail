@@ -7,7 +7,7 @@ import (
 	"github.com/qlustra/sail/internal/declaration"
 )
 
-// Contract retains the interface as a signature template. Application types
+// Contract retains the interface as a signature template. Subject types
 // need not implement that literal interface when it contains Self.
 type Contract struct {
 	typ       reflect.Type

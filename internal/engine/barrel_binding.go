@@ -123,7 +123,7 @@ func (b barrelDescriptor) populate(value reflect.Value, receivingType reflect.Ty
 	}
 
 	// Invoke through the declared interface's method set, whose index was
-	// resolved during chart compilation. No concrete method-name lookup is needed.
+	// resolved during charter compilation. No concrete method-name lookup is needed.
 	receiver := reflect.New(b.capability).Elem()
 	receiver.Set(reflect.New(typ))
 	method := receiver.Method(b.method.Index)

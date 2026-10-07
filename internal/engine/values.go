@@ -8,7 +8,7 @@ import (
 )
 
 // allocateDeclaration only initializes pointers along a selected declaration path.
-// Application types are inspected, never allocated here.
+// Subject types are inspected, never allocated here.
 func allocateDeclaration(value reflect.Value) (reflect.Value, error) {
 	if reflectutils.ResolvePointerChain(value.Type()) == nil {
 		return reflect.Value{}, fmt.Errorf("%v: cyclic declaration pointer type", value.Type())

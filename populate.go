@@ -7,18 +7,18 @@ import (
 	"github.com/qlustra/sail/legend"
 )
 
-// Populate allocates a world using legend L's shape to describe A's declaration.
-// The chart supplies the compiled descriptors; no live application is required.
-// Barrel and quality capabilities run on fresh zero-valued application-type
-// surrogates and must not depend on application state.
-func Populate[A any, L legend.Declaration](chart *Chart[L]) (*L, error) {
-	world := new(L)
-	var compiled *engine.Chart
-	if chart != nil {
-		compiled = chart.compiled
+// Populate allocates a Chart using legend L's shape to describe S's declaration.
+// The Charter supplies the compiled descriptors; no live Subject is required.
+// Barrel and quality capabilities run on fresh zero-valued Subject-type
+// surrogates and must not depend on Subject state.
+func Populate[S any, L legend.Declaration](charter *Charter[L]) (*L, error) {
+	chart := new(L)
+	var compiled *engine.Charter
+	if charter != nil {
+		compiled = charter.compiled
 	}
-	if err := engine.Populate(compiled, reflect.ValueOf(world).Elem(), reflect.TypeFor[A]()); err != nil {
+	if err := engine.Populate(compiled, reflect.ValueOf(chart).Elem(), reflect.TypeFor[S]()); err != nil {
 		return nil, err
 	}
-	return world, nil
+	return chart, nil
 }

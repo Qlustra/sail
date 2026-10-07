@@ -20,8 +20,8 @@ type spotDescriptor struct {
 
 // ======================================== Compilation
 
-// Explore compiles a complete chart before publishing any descriptors.
-func Explore(legendType reflect.Type) (*Chart, error) {
+// Explore compiles a complete charter before publishing any descriptors.
+func Explore(legendType reflect.Type) (*Charter, error) {
 	t := reflectutils.ResolvePointerChain(legendType)
 	if t == nil || t.Kind() != reflect.Struct || !reflectutils.TypeImplements[decl.LegendRole](t) {
 		return nil, fmt.Errorf("%v is not a legend declaration", legendType)
@@ -43,7 +43,7 @@ func Explore(legendType reflect.Type) (*Chart, error) {
 		return nil, err
 	}
 
-	return &Chart{Root: root, Codex: exp.codex, families: families}, nil
+	return &Charter{Root: root, Codex: exp.codex, families: families}, nil
 }
 
 type explorer struct {
@@ -99,7 +99,7 @@ func (e *explorer) explore(t reflect.Type) (*markerDescriptor, error) {
 	}
 
 	// Record locally validated descriptors before descending, so recursive spots
-	// link to the same object. Chart.Compile publishes only the completed graph.
+	// link to the same object. Charter.Compile publishes only the completed graph.
 	e.record(descriptor)
 	descriptor.lanes, err = e.collectLanes(t, lanes)
 	if err != nil {

@@ -17,7 +17,7 @@ func Visit[T any](visit func(T, Encounter) error) Visitors {
 
 // On adapts a typed callback to one visitor for use in a Visitors list.
 // Unmatched markers do not call visit; they remain part of the route.
-// Pointer callbacks receive original World storage. Interface callbacks prefer
+// Pointer callbacks receive original Chart storage. Interface callbacks prefer
 // the marker's pointer over its value.
 func On[T any](visit func(T, Encounter) error) Visitor {
 	if visit == nil {
@@ -25,7 +25,7 @@ func On[T any](visit func(T, Encounter) error) Visitor {
 	}
 	return func(encounter Encounter) error {
 		if encounter.occurrence == nil {
-			return fmt.Errorf("sail: visitor requires a World encounter")
+			return fmt.Errorf("sail: visitor requires a Chart encounter")
 		}
 		marker, matches := markerAs[T](encounter.occurrence.Value)
 		if !matches {

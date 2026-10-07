@@ -9,5 +9,5 @@ import "github.com/qlustra/sail/internal/declaration"
 // A barrel is optional unless its field declares barrel:"required". Get and
 // Present only read stored state; they never invoke or validate the capability.
 // Each populated barrel invokes its method on a fresh zero-valued surrogate;
-// the method must not depend on initialized Application state.
+// the method must not depend on initialized Subject state.
 type Barrel[V, I any] = declaration.Barrel[V, I]

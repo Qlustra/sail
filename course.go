@@ -8,7 +8,7 @@ import (
 )
 
 // Course is a reusable sequence of immediate-child selections starting at the
-// World root. It retains neither matched markers nor execution progress.
+// Chart root. It retains neither matched markers nor execution progress.
 type Course []Waypoint
 
 // Waypoint selects the next marker in a connected Course. Construct one with
@@ -24,7 +24,7 @@ type Waypoint struct {
 // A predicate receives a shallow copy of the concrete marker (a pointer to that
 // copy when T is a pointer or a matching interface). Referenced data remains
 // shared under ordinary Go copy semantics. Predicates must be read-only; Sail
-// neither deep-copies the World nor detects mutations. Invalid predicate lists
+// neither deep-copies the Chart nor detects mutations. Invalid predicate lists
 // are reported by Traverse rather than panicking here.
 func Select[T any](predicates ...func(T) bool) Waypoint {
 	waypoint := Waypoint{selection: engine.Waypoint{Type: reflect.TypeFor[T]()}}
@@ -55,8 +55,8 @@ func Select[T any](predicates ...func(T) bool) Waypoint {
 	return waypoint
 }
 
-// markerAs adapts an addressable World marker without allocating or following
-// Application storage. Pointer-first matching keeps interface visitors attached
+// markerAs adapts an addressable Chart marker without allocating or following
+// Subject storage. Pointer-first matching keeps interface visitors attached
 // to the original marker; concrete value requests use ordinary Go copies.
 func markerAs[T any](value reflect.Value) (marker T, matches bool) {
 	if marker, matches = value.Addr().Interface().(T); matches {

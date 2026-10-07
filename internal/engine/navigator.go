@@ -9,8 +9,8 @@ import (
 	"github.com/qlustra/sail/internal/reflectutils"
 )
 
-// Occurrence retains one populated marker and its position in the World.
-// Descriptors are shared; occurrence identity belongs to existing World storage.
+// Occurrence retains one populated marker and its position in the Chart.
+// Descriptors are shared; occurrence identity belongs to existing Chart storage.
 type Occurrence struct {
 	Value      reflect.Value
 	Source     decl.Reference
@@ -21,13 +21,13 @@ type Occurrence struct {
 	descriptor *markerDescriptor
 }
 
-func navigationRoot(chart *Chart, world reflect.Value) (*Occurrence, error) {
-	if chart == nil || chart.Root == nil {
-		return nil, fmt.Errorf("sail: traversal requires an explored chart")
+func navigationRoot(charter *Charter, chart reflect.Value) (*Occurrence, error) {
+	if charter == nil || charter.Root == nil {
+		return nil, fmt.Errorf("sail: traversal requires a compiled charter")
 	}
-	root, err := markerOccurrence(chart.Root, world)
+	root, err := markerOccurrence(charter.Root, chart)
 	if err != nil {
-		return nil, fmt.Errorf("sail: traversal world: %w", err)
+		return nil, fmt.Errorf("sail: traversal chart: %w", err)
 	}
 	root.ItemIndex = -1
 	return root, nil
@@ -39,10 +39,10 @@ func markerOccurrence(descriptor *markerDescriptor, value reflect.Value) (*Occur
 		return nil, err
 	}
 	if value.Type() != descriptor.typ {
-		return nil, fmt.Errorf("marker type %v does not match chart declaration %v", value.Type(), descriptor.typ)
+		return nil, fmt.Errorf("marker type %v does not match charter declaration %v", value.Type(), descriptor.typ)
 	}
 	if !value.CanAddr() || !value.CanInterface() {
-		return nil, fmt.Errorf("marker %v requires addressable World storage", descriptor.typ)
+		return nil, fmt.Errorf("marker %v requires addressable Chart storage", descriptor.typ)
 	}
 	carrier, err := reflectutils.FieldByPath(value, descriptor.carrierPath)
 	if err == nil {
@@ -60,7 +60,7 @@ func markerOccurrence(descriptor *markerDescriptor, value reflect.Value) (*Occur
 }
 
 // immediateChildren follows only lane and spot descriptors. It neither reads
-// live Application storage nor allocates missing World carriers.
+// live Subject storage nor allocates missing Chart carriers.
 func immediateChildren(parent *Occurrence) ([]*Occurrence, error) {
 	var children []*Occurrence
 	for _, lane := range parent.descriptor.lanes {

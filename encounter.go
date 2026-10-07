@@ -7,9 +7,9 @@ import (
 	"github.com/qlustra/sail/legend"
 )
 
-// Encounter describes one selected arrival in a World. Its parent chain follows
+// Encounter describes one selected arrival in a Chart. Its parent chain follows
 // marker relationships, with lanes and spots recorded as incoming edge context.
-// The context may be retained while the World's topology remains stable.
+// The context may be retained while the Chart's topology remains stable.
 type Encounter struct {
 	occurrence *engine.Occurrence
 	step       int

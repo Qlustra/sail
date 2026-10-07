@@ -8,28 +8,28 @@ import (
 	"github.com/qlustra/sail/internal/reflectutils"
 )
 
-// Populate fills a world destination from an application declaration.
-func Populate(c *Chart, world reflect.Value, appType reflect.Type) error {
+// Populate fills a chart destination from a subject declaration.
+func Populate(c *Charter, chart reflect.Value, subjectType reflect.Type) error {
 	if c == nil || c.Root == nil {
-		return fmt.Errorf("sail: populate requires an explored chart")
+		return fmt.Errorf("sail: populate requires a compiled charter")
 	}
 
-	legendType := reflectutils.ResolvePointerChain(world.Type())
+	legendType := reflectutils.ResolvePointerChain(chart.Type())
 	if legendType != c.Root.typ {
-		return fmt.Errorf("sail: world type %v does not match chart root %v", world.Type(), c.Root.typ)
+		return fmt.Errorf("sail: chart type %v does not match charter root %v", chart.Type(), c.Root.typ)
 	}
 
-	world, err := allocateDeclaration(world)
+	chart, err := allocateDeclaration(chart)
 	if err != nil {
 		return err
 	}
 	p := populator{families: c.families, active: make(map[populationKey]decl.Reference)}
-	return p.populate(c.Root, world, decl.Reference{Root: appType, Type: appType}, "", nil)
+	return p.populate(c.Root, chart, decl.Reference{Root: subjectType, Type: subjectType}, "", nil)
 }
 
 type populationKey struct {
-	descriptor *markerDescriptor
-	appType    reflect.Type
+	descriptor  *markerDescriptor
+	subjectType reflect.Type
 }
 
 type populator struct {
@@ -59,13 +59,13 @@ func (p *populator) populate(descriptor *markerDescriptor, value reflect.Value, 
 }
 
 func (p *populator) populateLanes(descriptor *markerDescriptor, value reflect.Value, source decl.Reference) error {
-	appType := reflectutils.ResolvePointerChain(source.Type)
-	if appType == nil || appType.Kind() != reflect.Struct {
-		return fmt.Errorf("%s: %v requires an application declaration that resolves to a struct, got %v", source, descriptor.typ, source.Type)
+	subjectType := reflectutils.ResolvePointerChain(source.Type)
+	if subjectType == nil || subjectType.Kind() != reflect.Struct {
+		return fmt.Errorf("%s: %v requires a subject declaration that resolves to a struct, got %v", source, descriptor.typ, source.Type)
 	}
-	key := populationKey{descriptor: descriptor, appType: appType}
+	key := populationKey{descriptor: descriptor, subjectType: subjectType}
 	if previous, exists := p.active[key]; exists {
-		return fmt.Errorf("%s: recursive population of %v against %v returns to %s", source, descriptor.typ, appType, previous)
+		return fmt.Errorf("%s: recursive population of %v against %v returns to %s", source, descriptor.typ, subjectType, previous)
 	}
 	p.active[key] = source
 	defer delete(p.active, key)
@@ -74,14 +74,14 @@ func (p *populator) populateLanes(descriptor *markerDescriptor, value reflect.Va
 	if err != nil {
 		return fmt.Errorf("%s: %w", source, err)
 	}
-	for i := 0; i < appType.NumField(); i++ {
-		field := appType.Field(i)
+	for i := 0; i < subjectType.NumField(); i++ {
+		field := subjectType.Field(i)
 		if _, marked := field.Tag.Lookup(descriptor.mark.tag); !marked {
 			continue
 		}
 		child := source.Child(field)
 		if !field.IsExported() {
-			return fmt.Errorf("%s: marked application field must be exported", child)
+			return fmt.Errorf("%s: marked subject field must be exported", child)
 		}
 		selected, err := lanes.selectField(field)
 		if err != nil {

@@ -23,7 +23,7 @@ func CompileReader(value, capability reflect.Type, name string) (Reader, error) 
 		return Reader{}, err
 	}
 	if ContainsSelf(value, make(map[reflect.Type]bool)) {
-		return Reader{}, fmt.Errorf("capability value type %v contains Self; use any to store an application-dependent result", value)
+		return Reader{}, fmt.Errorf("capability value type %v contains Self; use any to store a subject-dependent result", value)
 	}
 	method, exists := capability.MethodByName(name)
 	if !exists || !method.IsExported() {

@@ -19,8 +19,8 @@ import (
 // A successful zero or nil result still returns present=true. Use V=any to
 // retain the dynamic type of a Self result.
 //
-// No live application is inspected or mutated. The method must not depend on
-// initialized application state. Each call invokes independently; results are
+// No live subject is inspected or mutated. The method must not depend on
+// initialized subject state. Each call invokes independently; results are
 // not cached. Qualities reuse this machinery and require capability presence
 // when their owning qualifier is active.
 func ReadCapability[V, I any](receivingType reflect.Type, method string) (value V, present bool, err error) {

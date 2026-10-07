@@ -7,93 +7,101 @@ Sail has two public packages in one module:
 
 | Import | Responsibility |
 | --- | --- |
-| `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated state. |
-| `github.com/qlustra/sail` | Operations: `Chart[L]`, `CompileLegend`, `Chart.Compile`, `Populate`, Course-based World traversal, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
+| `github.com/qlustra/sail/legend` | Authoring vocabulary: markers, lanes, spots, features, qualifiers, barrels, qualities, acceptance declarations, hook interfaces, and `Self`. These types also hold populated Chart state. |
+| `github.com/qlustra/sail` | Operations: `Charter[L]`, `CompileLegend`, `Charter.Compile`, `Populate`, `Vessel[S, L]`, `Materialize`, Course-based Chart traversal, `Bind`, `ReadCapability`, and `ResolvePointerChain`. |
 
 Declaration examples use `legend`:
 
 ```go
 import "github.com/qlustra/sail/legend"
 
-type ProgramLegend struct {
-	legend.Legend
-	// Declare lanes and spots here.
+type TreeLegend struct {
+    legend.Legend
+    // Declare lanes and spots here.
 }
 
-func (ProgramLegend) Mark() string { return "app" }
+func (TreeLegend) Mark() string { return "tree" }
 ```
 
-Orchestration imports root `sail` for `sail.CompileLegend[ProgramLegend]()` and
-`sail.Populate[App](chart)`.
+Orchestration imports root `sail`:
+
+```go
+charter, err := sail.CompileLegend[TreeLegend]()
+chart, err := sail.Populate[Tree](charter)
+vessel, err := sail.Materialize[Tree](charter, chart)
+```
 
 The implementation is organized under `internal/`:
 
 | Package | Responsibility |
 | --- | --- |
-| `declaration` | Canonical declaration carriers, populated state, application references, and the sealed access used by the engine. Public `legend` types alias these carriers. |
-| `engine` | Compiled descriptors, compilation, population, World navigation and route planning, and live binding through application references. |
+| `declaration` | Canonical declaration carriers, populated Chart state, Subject references, and the sealed access used by the engine. Public `legend` types alias these carriers. |
+| `engine` | Compiled descriptors, compilation, population, Chart navigation and route planning, Vessel association checks, and live binding through Subject references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
 | `reflectutils` | Type inspection, field access, and receiver binding, independent of Sail's declaration model. |
 
-`Chart[L]` keeps compiled descriptors private. Public `legend` carriers alias
+`Charter[L]` keeps compiled descriptors private. Public `legend` carriers alias
 canonical internal declaration types, so reflection reports those canonical type
 names. The aliases retain the sealed protocols used for inspection and population
 without exposing those operations in the public declaration API.
 
-Consumers use the public packages. The internal division introduces no additional
-module or World wrapper; the populated result remains `*L`.
-
 ## Vocabulary and lifecycle
 
-Sail is a meta-framework for interpreting application declarations. A framework
-such as Dome authors a **Legend**; a CLI authors an **Application**.
+Sail interprets Subject declarations using a framework-authored Legend. A Subject
+can be a tree, a subsystem, or another part of an application's runtime.
 
 | Term | Meaning |
 | --- | --- |
-| Legend | The framework's authored declaration, rooted in `legend.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
-| Chart | The reusable compiled descriptor graph produced by compiling a Legend. Its Go type is `sail.Chart[L]`. |
-| Application | The consumer's Go declaration `A`, or a live instance of it. State which when the distinction matters. |
-| World | The populated `*L` describing a particular Application declaration. It holds marker occurrences and their metadata. |
-| Populated marker | A marker value representing a particular place in the Application declaration. |
-| Application reference | A populated marker's recorded root type, receiving type, and field path, used for later live binding. |
+| Legend | The framework's authored declaration `L`, rooted in `legend.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
+| Charter | The reusable compiled descriptor graph produced by compiling a Legend. Its Go type is `sail.Charter[L]`. |
+| Chart | The populated `*L` describing a particular Subject declaration. It holds marker occurrences, metadata, and Subject references. |
+| Subject | The runtime value Sail works with. Distinguish its declaration `S` from its live instance `*S` when relevant. |
+| Vessel | The operational holder associating a Charter, Chart, and live Subject. Its Go type is `sail.Vessel[S, L]`. |
+| Populated marker | A marker value representing a particular place in the Subject declaration. |
+| Subject reference | A populated marker's recorded root type, receiving type, and field path, used for later live binding. |
+| Navigator | The machinery responsible for access and movement through a topology. It is not a public interface in this slice. |
 
 **Declarations** are authored Go structures. **Descriptors** are Sail's internal
-compiled representation. The World currently reuses the Legend's Go shape as
-its storage: `Populate` returns `*L`, not a separate `World[L]` wrapper.
+compiled representation. The Chart uses the Legend's Go shape as its storage:
+`Populate` returns `*L`. The Legend defines the representation; the Chart fills it.
 
 ```mermaid
 flowchart LR
-    L["Legend declaration L"] -->|"CompileLegend[L]()"| C["Chart[L]: compiled descriptors"]
-    C --> P["Populate[A](chart)"]
-    A["Application declaration A"] --> P
-    P --> W["World: populated *L"]
-    W --> M["Populated marker with Application reference"]
-    M --> B["Bind[I](app, marker)"]
-    I["Live Application instance"] --> B
+    L["Legend declaration L"] -->|"CompileLegend[L]()"| C["Charter[L]: compiled descriptors"]
+    C --> P["Populate[S](charter)"]
+    S["Subject declaration S"] --> P
+    P --> T["Chart: populated *L"]
+    C --> M["Materialize(charter, chart, subject)"]
+    T --> M
+    I["Live Subject instance *S"] --> M
+    M --> V["Vessel[S, L]"]
+    T --> B["Bind[I](subject, marker)"]
+    I --> B
     B --> R["Interface receiver I"]
 ```
 
 Compilation and population inspect declarations. Population invokes declared
-capabilities on zero-valued surrogates; it requires no live Application instance.
-World traversal resolves connected Courses using the Chart, then visits selected
-markers. Binding resolves a populated marker against existing Application storage.
-Unrestricted crawling and live Application traversal remain future work.
+capabilities on zero-valued surrogates; it requires no live Subject instance.
+Chart traversal resolves connected Courses using the Charter, then visits
+selected markers. Binding resolves a populated marker against existing Subject
+storage. Materialization associates the Charter and Chart with live root storage.
+Unrestricted crawling and live Subject traversal remain future work.
 
 ## Population
 
-`CompileLegend[L]()` builds a Chart with the Legend declaration L.
-To compile an existing `Chart[L]`, call `chart.Compile()`. Compilation validates
-declarations before replacing the Chart's descriptors; a failed compilation
-leaves an existing Chart unchanged.
+`CompileLegend[L]()` builds a Charter with the Legend declaration L.
+To compile an existing `Charter[L]`, call `charter.Compile()`. Compilation validates
+declarations before replacing the Charter's descriptors; a failed compilation
+leaves an existing Charter unchanged.
 
-`Populate[A](chart)` returns a fresh World (`*L`) populated against **A's type**.
-The Chart holds reusable descriptors; populated markers hold metadata and
-Application references for individual occurrences. Markers expose
-`ApplicationType()` and a copied `ApplicationPath()` so consumers can interpret
+`Populate[S](charter)` returns a fresh Chart (`*L`) populated against **S's type**.
+The Charter holds reusable descriptors; populated markers hold metadata and
+Subject references for individual occurrences. Markers expose
+`SubjectType()` and a copied `SubjectPath()` so consumers can interpret
 receiving types and retain declaration order across spot kinds.
 
-Population reads marked Application fields in declaration order, selecting spots
+Population reads marked Subject fields in declaration order, selecting spots
 within the current lane. An unmatched field advances to the next lane only
 after the current lane's minimum counts are satisfied. A matched spot exceeding
 its maximum fails immediately; population does not retry another lane to make
@@ -105,18 +113,48 @@ fields must be exported and match a remaining spot. Legends and regions apply
 to structs (including through pointers); landmarks describe leaf declarations.
 
 Single spots hold one marker in `Value`, optional spots hold a marker pointer
-or nil in `Value`, and multi spots hold a slice in `Value`. Repeated Application
+or nil in `Value`, and multi spots hold a slice in `Value`. Repeated Subject
 types are populated independently.
 Composite spot declarations must embed their spot carrier and intermediate
 wrappers by value. Compilation rejects pointer embeddings along that chain;
 `OptionalSpot.Value` still uses nil to represent an absent occurrence.
-An active cycle of the same marker and Application types is rejected because it
-would require an infinite expansion. Live Application binding remains separate.
+An active cycle of the same marker and Subject types is rejected because it
+would require an infinite expansion. Live Subject binding remains separate.
 
-## World traversal
+## Materialization
+
+`Materialize[S](charter, chart)` creates a Vessel with fresh zero-valued Subject
+root storage allocated by `new(S)`. To retain an existing Subject, supply its
+pointer as the final argument; both generic parameters can then be inferred:
+
+```go
+fresh, err := sail.Materialize[Tree](charter, chart)
+
+// One Subject can be shared by Vessels using different Legends.
+tree := &Tree{}
+attached, err := sail.Materialize(charter, chart, tree)
+```
+
+The variadic tail represents one optional Subject. More than one pointer and an
+explicit nil pointer are errors. Materialization checks that the Charter is
+compiled, the Chart is populated with the corresponding Legend, and the live
+Subject root can bind to its recorded reference. On failure it returns no Vessel.
+It retains the supplied Charter, Chart, and Subject without copying them.
+
+`vessel.Subject` exposes the actual `*S`. Fresh Subjects are independent; supplied
+Subjects preserve their existing state and identity. Materialization does not
+allocate nested pointer fields, invoke Subject hooks, or perform framework
+composition. If S is itself a pointer type, fresh `new(S)` storage does not
+initialize its pointee; missing root storage is an error. Frameworks construct
+and configure their own state before or after materialization as appropriate.
+
+`vessel.Traverse(traversal)` forwards Chart traversal to the retained Charter and
+Chart. Visitors receive populated markers; this is not live Subject walking.
+
+## Chart traversal
 
 A **Course** is a reusable sequence of **Waypoints**. Each waypoint selects
-exactly one immediate child marker, starting at the World root:
+exactly one immediate child marker, starting at the Chart root:
 
 ```go
 course := sail.Course{
@@ -126,7 +164,7 @@ course := sail.Course{
     }),
 }
 
-err := chart.Traverse(world, sail.Traversal{
+err := charter.Traverse(chart, sail.ChartTraversal{
     Course: course,
     Visit: sail.Visit(func(command *CommandRegion, encounter sail.Encounter) error {
         fmt.Println(encounter.Depth(), command.Name.Get(), encounter.Destination())
@@ -135,25 +173,25 @@ err := chart.Traverse(world, sail.Traversal{
 })
 ```
 
-The World navigator follows the Chart's lane and spot descriptors to existing
+The Chart navigator follows the Charter's lane and spot descriptors to existing
 populated markers. Lanes and spots describe incoming relationships, not extra
 waypoints. A selector never searches deeper descendants to fill a missing step.
-Lane order is preserved; candidates within a lane follow Application declaration
+Lane order is preserved; candidates within a lane follow Subject declaration
 order across spot kinds. Nil optional spots and empty multi spots have no children.
 
 Before processing, Sail resolves the **entire Course** into an internal
 **RoutePlan**. Every step must have exactly one match; a missing or ambiguous
 later step fails without invoking any visitor. A Course stores only selection
-instructions and may be reused against another compatible World. A RoutePlan
+instructions and may be reused against another compatible Chart. A RoutePlan
 retains the concrete occurrences for that execution and is not exposed publicly.
 
 `Select[T]()` matches marker values, pointers, or interfaces; its optional
 predicate receives a **shallow copy of the concrete marker**. Pointer predicates
 receive a pointer to that copy. Nested pointers, slices, and maps retain normal
 Go sharing semantics. Predicates must be read-only; Sail does not deep-copy the
-World or detect mutations. Interface adaptation prefers the marker's pointer.
+Chart or detect mutations. Interface adaptation prefers the marker's pointer.
 
-`Traversal.Visit` always holds a `sail.Visitors` list. `Visit[T]` constructs a
+`ChartTraversal.Visit` always holds a `sail.Visitors` list. `Visit[T]` constructs a
 single-item list; `On[T]` constructs one visitor for composing a list:
 
 ```go
@@ -167,12 +205,12 @@ Visit: sail.Visitors{
 Each selected encounter passes through the list in registration order. Every
 matching typed visitor runs; an unmatched callback does not remove a waypoint or
 prevent other visitors from participating. Pointer visitors receive the original
-World marker, so later visitors see earlier visitors' metadata changes. Visitor
+Chart marker, so later visitors see earlier visitors' metadata changes. Visitor
 registrations are copied on entry; the list must be nonempty and contain no nil
 entries, checked before selectors or visitors run.
 
 The topology must remain stable during planning and execution. No declaration
-hooks or live Application methods are invoked by navigation itself. Selector and
+hooks or live Subject methods are invoked by navigation itself. Selector and
 visitor panics propagate normally. The first visitor error ends both the list and
 the traversal, preserving its cause with waypoint and visitor context.
 
@@ -187,18 +225,18 @@ An **Encounter** records the arrival and its route context:
 - `LanePath()` is relative to the parent marker; `SpotPath()` is relative to the
   lane. Both return copied field-index paths. `ItemIndex()` gives the multi-spot
   slice index, zero for single/optional spots, or -1 at the root. These describe
-  World storage, independently of the marker's `ApplicationPath()`.
+  Chart storage, independently of the marker's `SubjectPath()`.
 
 This slice requires a nonempty Course and visitor list. It does not provide crawling,
-descendant-search waypoints, movement controls, or live Application traversal.
+descendant-search waypoints, movement controls, or live Subject traversal.
 
 ## Live binding
 
-`Bind[I](app, marker)` resolves one populated marker against the live
-Application and returns an ordinary Go interface receiver:
+`Bind[I](subject, marker)` resolves one populated marker against the live
+Subject and returns an ordinary Go interface receiver:
 
 ```go
-command := &world.EntryPoint.MainCommand.Value
+command := &chart.EntryPoint.MainCommand.Value
 receiver, present, err := sail.Bind[Runnable](&program, command)
 if err != nil {
 	return err
@@ -210,7 +248,7 @@ if present {
 
 The root must be a nonnil pointer leading to the exact recorded root type;
 additional pointer wrappers are allowed. Sail follows the stored field path
-without allocating Application storage or constructing addressable copies.
+without allocating Subject storage or constructing addressable copies.
 Addressable concrete fields bind through their address when it implements I, preserving the
 connection to their original storage even for value-receiver interfaces.
 
@@ -225,9 +263,9 @@ storage, inaccessible receivers, and receiver cycles produce contextual errors.
 I must be an interface; `Self` signature templates are not substituted into a
 runtime Go interface.
 
-Binding invokes no Application methods and does not traverse siblings or descendants.
-The caller owns invocation and its error handling. World Course selection can
-supply a marker to bind; cascading live Application walking remains separate work.
+Binding invokes no Subject methods and does not traverse siblings or descendants.
+The caller owns invocation and its error handling. Chart Course selection can
+supply a marker to bind; cascading live Subject walking remains separate work.
 
 ## Acceptance
 
@@ -258,7 +296,7 @@ Each declaration selects one rule:
   defined-type identity. Concrete types support methods on T or *T; interface
   declarations use their own method set. Direct `Self` parameters and results
   resolve to T, including when T is an interface. No surrogate is constructed
-  and no Application method is invoked. Non-interface contracts and unsupported
+  and no Subject method is invoked. Non-interface contracts and unsupported
   `Self` signatures fail compilation. Barrels and qualities still require
   concrete receivers for invocation.
 
@@ -267,7 +305,7 @@ descending, or invoking its capabilities. Legends and regions must still resolve
 to structs. Rule combinations and collection element constraints are not defined.
 
 Marks and lanes select the occurrence first. An acceptance mismatch fails with
-the Application path, marker, expected type, and actual type; it does not retry
+the Subject path, marker, expected type, and actual type; it does not retry
 another spot or advance the lane. Only selected occurrences are checked;
 untagged fields remain outside population.
 
@@ -291,17 +329,17 @@ func (CommandRegion) Family() string { return "command" }
 
 The capability must be an interface. Its selected method must be exported, take
 no arguments, and return exactly one value assignable to the barrel's value
-type. Compilation validates this contract before any World is populated.
+type. Compilation validates this contract before any Chart is populated.
 
 Omitting `barrel` means `barrel:"optional"`: an unavailable capability leaves
 the barrel empty. `barrel:"required"` instead makes absence a population error.
 Availability requires a concrete receiving type whose pointer implements the
-interface; this covers value and pointer methods. An interface-typed Application
+interface; this covers value and pointer methods. An interface-typed Subject
 field cannot supply a concrete surrogate from its static declaration alone.
 
 After the occurrence's fields and child lanes are populated, each barrel calls
 its selected method on a fresh zero-valued surrogate. Hooks must work without
-initialized application state. A hook panic fails population with the Application
+initialized subject state. A hook panic fails population with the Subject
 path and barrel field in the error. Multiple barrels may select the same method;
 they invoke independently and each stores its result.
 
@@ -313,7 +351,7 @@ population hook is required.
 ## Qualities
 
 A qualifier composite can declare capabilities required when its symbol is
-present on an Application occurrence:
+present on a Subject occurrence:
 
 ```go
 type Defaultable[T any] interface {
@@ -337,7 +375,7 @@ type Remote string
 func (Remote) Default() Remote { return "origin" }
 ```
 
-For an Application field `Remote Remote` marked with `arg,default`, population
+For a Subject field `Remote Remote` marked with `arg,default`, population
 requires and invokes `Default() Remote`. Without the qualifier, the quality
 stays inactive: no capability is required or invoked. This association comes
 from nesting, not from the symbol's meaning. Reusable qualifier wrappers retain
@@ -345,7 +383,7 @@ the qualities declared along their embedded `Qualifier` path.
 
 `Self` matches the receiving type after pointer normalization, preserving
 defined-type identity. It is a signature placeholder, not a Go interface that
-the Application type must literally implement. Sail checks the entire capability's
+the Subject type must literally implement. Sail checks the entire capability's
 method set. This slice supports Self directly in method parameters and results;
 compound uses such as `[]Self` and `*Self` fail compilation. Interfaces using
 Self must have exported methods. Ordinary interfaces use Go's implementation
@@ -360,7 +398,7 @@ interface containing the actual `Remote` value, not a converted string.
 Each active quality invokes its method on a fresh zero-valued surrogate, after
 the occurrence's fields and child lanes are populated. Missing or mismatched
 capabilities, incompatible storage, and hook panics fail population with the
-Application and qualifier context. `Present()` distinguishes an inactive quality
+Subject and qualifier context. `Present()` distinguishes an inactive quality
 from a successful zero or nil result. Reading a quality never invokes or
 validates its value. Live-value parsing and validation remain separate.
 
@@ -372,7 +410,7 @@ interface remains an interface; a declaration alone cannot resolve its concrete
 implementation.
 
 `ReadCapability[V, I](typ, method)` reads a declaration capability without a
-Chart or qualifier. It uses the same contract matching and invocation machinery
+Charter, populated Chart, or qualifier. It uses the same contract matching and invocation machinery
 as qualities:
 
 ```go
@@ -387,19 +425,19 @@ rules as qualities. In this example, `value` contains a `Remote`, preserving its
 dynamic type.
 
 An unavailable or incompatible capability returns `present == false` without
-an error. This includes nil, cyclic pointer, and interface Application types that
+an error. This includes nil, cyclic pointer, and interface Subject types that
 cannot supply a surrogate. Invalid capability requests, incompatible storage,
 and hook panics return errors. A successful zero or nil result still returns
 `present == true`.
 
 Every call constructs a fresh zero-valued surrogate and invokes independently;
-it does not access a live Application or cache results. The caller decides whether
+it does not access a live Subject or cache results. The caller decides whether
 to request a capability and how to use its result. Qualities instead retain
-their compiled reader in the Chart and require presence when activated.
+their compiled reader in the Charter and require presence when activated.
 
 ## Lane policies
 
-Lanes form ordered bands in an Application declaration. Spots are unordered
+Lanes form ordered bands in a Subject declaration. Spots are unordered
 alternatives within a lane. The `exploration` tag declares how fields are
 assigned to lanes:
 

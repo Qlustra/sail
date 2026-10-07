@@ -15,14 +15,14 @@ type Reference struct {
 	Path []int
 }
 
-func (m marker) applicationReference() Reference { return m.source }
+func (m marker) subjectReference() Reference { return m.source }
 
-// ApplicationType returns the declared Application type described by this marker.
+// SubjectType returns the declared Subject type described by this marker.
 // It is nil until the marker has been populated.
-func (m marker) ApplicationType() reflect.Type { return m.source.Type }
+func (m marker) SubjectType() reflect.Type { return m.source.Type }
 
-// ApplicationPath returns a copy of the field-index path from the Application root.
-func (m marker) ApplicationPath() []int { return slices.Clone(m.source.Path) }
+// SubjectPath returns a copy of the field-index path from the Subject root.
+func (m marker) SubjectPath() []int { return slices.Clone(m.source.Path) }
 
 func (r Reference) Child(field reflect.StructField) Reference {
 	return Reference{Root: r.Root, Type: field.Type, Path: slices.Concat(r.Path, field.Index)}
@@ -48,5 +48,5 @@ func SetSource(carrier any, source Reference) {
 
 // ReferenceOf bypasses public accessors which a composite may shadow.
 func ReferenceOf(carrier any) Reference {
-	return carrier.(interface{ applicationReference() Reference }).applicationReference()
+	return carrier.(interface{ subjectReference() Reference }).subjectReference()
 }
