@@ -61,7 +61,8 @@ func (v *Vessel[S, L]) Traverse(traversal chart.Traversal) error {
 // Propagate visits the live Subject using an explicit initial order. Interceptors
 // bind existing receivers and choose local descent order, pruning, or stopping.
 // Enterable carriers supply typed members interpreted through this Vessel's
-// Legend. Nil branches are skipped; Chart topology must remain stable.
+// Legend. DescendSelected replaces normal children for one occurrence. Nil
+// branches are skipped; Chart topology must remain stable.
 //
 // Shared receivers are offered on each arrival. First identifies the first
 // arrival, and Cycle identifies a return to an ancestor. Cyclic arrivals may be

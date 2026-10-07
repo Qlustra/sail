@@ -12,11 +12,12 @@ const (
 )
 
 // Route determines movement after an interceptor handles an occurrence.
-// Construct one with Pass, Descend, Prune, or Stop.
+// Construct one with Pass, Descend, DescendSelected, Prune, or Stop.
 type Route struct {
 	action   routeAction
 	order    Order
 	complete func() error
+	selected *Children
 	err      error
 }
 
@@ -28,13 +29,28 @@ func Pass() Route { return Route{} }
 // At most one completion callback may be supplied; nil means no callback.
 // Invalid arguments are reported by propagation rather than panicking here.
 func Descend(order Order, complete ...func() error) Route {
+	return descent("Descend", order, complete)
+}
+
+// DescendSelected replaces this occurrence's normal children with the supplied
+// typed source. Ordering and successful completion follow Descend's rules.
+func DescendSelected(order Order, children Children, complete ...func() error) Route {
+	route := descent("DescendSelected", order, complete)
+	if route.err == nil {
+		route.err = children.validate()
+	}
+	route.selected = &children
+	return route
+}
+
+func descent(name string, order Order, complete []func() error) Route {
 	route := Route{action: descendRoute, order: order}
 	if err := order.validate(); err != nil {
 		route.err = err
 		return route
 	}
 	if len(complete) > 1 {
-		route.err = fmt.Errorf("Descend accepts at most one completion callback, got %d", len(complete))
+		route.err = fmt.Errorf("%s accepts at most one completion callback, got %d", name, len(complete))
 		return route
 	}
 	if len(complete) == 1 {

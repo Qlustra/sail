@@ -150,7 +150,7 @@ func (p *propagator) begin(f *frame, inherited Order) (*childCursor, error) {
 	if f.current.cycle != nil {
 		return nil, f.failure(fmt.Errorf("cannot descend into a cycle returning to %s", f.current.cycle.Source()))
 	}
-	cursor, err := p.children(f, value)
+	cursor, err := p.children(f, value, route.selected)
 	if err != nil {
 		return nil, f.failure(err)
 	}

@@ -23,27 +23,40 @@ type childCursor struct {
 	stop   func()
 }
 
-func (p *propagator) children(f *frame, value reflect.Value) (*childCursor, error) {
-	declared, err := f.navigator.Children(f.occurrence)
-	if err != nil {
-		return nil, err
-	}
-	source, entered, err := reflectutils.BindInterface[Enterable](value)
-	if err != nil {
-		return nil, fmt.Errorf("enter: %w", err)
-	}
+func (p *propagator) children(f *frame, value reflect.Value, selected *Children) (*childCursor, error) {
+	var declared []*engine.Occurrence
 	var members Children
 	var chart reflect.Value
-	if entered {
-		members, err = source.Enter()
+	entered := selected != nil
+	sourceName := "selected children"
+	if selected != nil {
+		members = *selected
+	} else {
+		sourceName = "enter"
+		var err error
+		declared, err = f.navigator.Children(f.occurrence)
+		if err != nil {
+			return nil, err
+		}
+		source, present, err := reflectutils.BindInterface[Enterable](value)
 		if err != nil {
 			return nil, fmt.Errorf("enter: %w", err)
 		}
+		entered = present
+		if entered {
+			members, err = source.Enter()
+			if err != nil {
+				return nil, fmt.Errorf("enter: %w", err)
+			}
+		}
+	}
+	if entered {
 		if err := members.validate(); err != nil {
-			return nil, fmt.Errorf("enter: %w", err)
+			return nil, fmt.Errorf("%s: %w", sourceName, err)
 		}
 		chart = p.charts[members.memberType]
 		if !chart.IsValid() {
+			var err error
 			chart, err = engine.MemberChart(p.charter, members.memberType)
 			if err != nil {
 				return nil, fmt.Errorf("entered member %v: %w", members.memberType, err)
