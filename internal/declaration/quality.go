@@ -16,14 +16,14 @@ func (q Quality[V, I]) Present() bool { return q.present }
 type QualityShape struct {
 	Value      reflect.Type
 	Capability reflect.Type
-	Carrier    reflect.Type
+	Base       reflect.Type // Concrete Quality type embedded by composite declarations.
 }
 
 func (*Quality[V, I]) quality() QualityShape {
 	return QualityShape{
 		Value:      reflect.TypeFor[V](),
 		Capability: reflect.TypeFor[I](),
-		Carrier:    reflect.TypeFor[Quality[V, I]](),
+		Base:       reflect.TypeFor[Quality[V, I]](),
 	}
 }
 

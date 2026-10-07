@@ -1,23 +1,23 @@
 // Package legend provides the declaration vocabulary used to compile a Sail
-// Charter and the typed storage populated in a Chart.
+// Charter and the typed values populated in a Chart.
 package legend
 
 import "github.com/qlustra/sail/internal/declaration"
 
 // Legend is embedded in the root declaration used to compile a Charter.
-// Its populated value carries the Chart's reference to the Subject root.
+// Its populated value records the Subject root as its carrier.
 type Legend = declaration.Legend
 
-// Region describes a Subject occurrence with child lanes.
+// Region describes a carrier with child lanes.
 type Region = declaration.Region
 
-// Landmark describes a Subject occurrence without child lanes.
+// Landmark describes a carrier without child lanes.
 type Landmark = declaration.Landmark
 
 // Declaration is a Legend with its required Mark hook.
 type Declaration = declaration.LegendDeclaration
 
-// MarkerDeclaration identifies a Legend, Region, or Landmark carrier.
+// MarkerDeclaration identifies a Legend, Region, or Landmark declaration.
 type MarkerDeclaration = declaration.MarkerDeclaration
 
 // MarkProvider supplies the Legend's tag namespace, inherited by its descriptors.

@@ -35,13 +35,13 @@ The implementation is organized under `internal/`:
 
 | Package | Responsibility |
 | --- | --- |
-| `declaration` | Canonical declaration carriers, populated Chart state, Subject references, and the sealed access used by the engine. Public `legend` types alias these carriers. |
-| `engine` | Compiled descriptors, compilation, population, Chart navigation and route planning, Vessel association checks, and live binding through Subject references. |
+| `declaration` | Canonical declaration types, populated Chart state, carrier references, and the sealed access used by the engine. Public `legend` types alias these types. |
+| `engine` | Compiled descriptors, compilation, population, Chart navigation and route planning, Vessel association checks, and live binding through carrier references. |
 | `capability` | Interface contract matching, declaration capability readers, and guarded declaration invocation. |
 | `tags` | Tag parsing and validation. |
 | `reflectutils` | Type inspection, field access, and receiver binding, independent of Sail's declaration model. |
 
-`Charter[L]` keeps compiled descriptors private. Public `legend` carriers alias
+`Charter[L]` keeps compiled descriptors private. Public `legend` types alias
 canonical internal declaration types, so reflection reports those canonical type
 names. The aliases retain the sealed protocols used for inspection and population
 without exposing those operations in the public declaration API.
@@ -49,22 +49,31 @@ without exposing those operations in the public declaration API.
 ## Vocabulary and lifecycle
 
 Sail interprets Subject declarations using a framework-authored Legend. A Subject
-can be a tree, a subsystem, or another part of an application's runtime.
+can be a tree, a subsystem, or another runtime component.
 
 | Term | Meaning |
 | --- | --- |
 | Legend | The framework's authored declaration `L`, rooted in `legend.Legend`, describing markers, ordered lanes, spots, metadata, and contracts. |
 | Charter | The reusable compiled descriptor graph produced by compiling a Legend. Its Go type is `sail.Charter[L]`. |
-| Chart | The populated `*L` describing a particular Subject declaration. It holds marker occurrences, metadata, and Subject references. |
+| Chart | The populated `*L` describing a particular Subject declaration. It holds marker occurrences, metadata, and carrier references. |
 | Subject | The runtime value Sail works with. Distinguish its declaration `S` from its live instance `*S` when relevant. |
+| Marker | The collective term for Regions and Landmarks in a Legend or Chart. The root Legend also participates in the marker contract. |
+| Carrier | The Subject field represented by a marker. Its declared type is the carrier type; a live Subject supplies its value. The root Legend uses the Subject root itself as its carrier. |
 | Vessel | The operational holder associating a Charter, Chart, and live Subject. Its Go type is `sail.Vessel[S, L]`. |
-| Populated marker | A marker value representing a particular place in the Subject declaration. |
-| Subject reference | A populated marker's recorded root type, receiving type, and field path, used for later live binding. |
+| Populated marker | A marker value representing a particular carrier in the Subject declaration. |
+| Carrier reference | A populated marker's recorded Subject root type, carrier type, and field path, used for later live binding. |
+| Receiver | The Go value or pointer used to invoke a method. Binding adapts a live carrier to the requested interface receiver. |
 | Navigator | The machinery responsible for access and movement through a topology. It is not a public interface in this slice. |
 
 **Declarations** are authored Go structures. **Descriptors** are Sail's internal
-compiled representation. The Chart uses the Legend's Go shape as its storage:
+compiled representation. The Chart has the Legend's Go shape:
 `Populate` returns `*L`. The Legend defines the representation; the Chart fills it.
+
+Markers belong to the Legend and Chart; carriers belong to the Subject. In a
+field declaration such as `Remote Remote`, the field is the carrier and its
+declared type is `Remote`. A live Subject supplies its value, while a method
+receiver may be that value or its address. Carrier is vocabulary for existing
+Subject fields and values, not an additional Go wrapper type.
 
 ```mermaid
 flowchart LR
@@ -84,8 +93,8 @@ flowchart LR
 Compilation and population inspect declarations. Population invokes declared
 capabilities on zero-valued surrogates; it requires no live Subject instance.
 Chart traversal resolves connected Courses using the Charter, then visits
-selected markers. Binding resolves a populated marker against existing Subject
-storage. Materialization associates the Charter and Chart with live root storage.
+selected markers. Binding resolves a populated marker against an existing
+Subject. Materialization associates the Charter and Chart with a live Subject.
 Unrestricted crawling and live Subject traversal remain future work.
 
 ## Population
@@ -97,9 +106,11 @@ leaves an existing Charter unchanged.
 
 `Populate[S](charter)` returns a fresh Chart (`*L`) populated against **S's type**.
 The Charter holds reusable descriptors; populated markers hold metadata and
-Subject references for individual occurrences. Markers expose
-`SubjectType()` and a copied `SubjectPath()` so consumers can interpret
-receiving types and retain declaration order across spot kinds.
+carrier references for individual occurrences. Markers expose
+`CarrierType()` and a copied `CarrierPath()` so consumers can interpret
+carrier types and retain declaration order across spot kinds. The type is the
+original declared field type, including pointers. The root Legend reports the
+Subject root type and an empty path.
 
 Population reads marked Subject fields in declaration order, selecting spots
 within the current lane. An unmatched field advances to the next lane only
@@ -113,18 +124,18 @@ fields must be exported and match a remaining spot. Legends and regions apply
 to structs (including through pointers); landmarks describe leaf declarations.
 
 Single spots hold one marker in `Value`, optional spots hold a marker pointer
-or nil in `Value`, and multi spots hold a slice in `Value`. Repeated Subject
+or nil in `Value`, and multi spots hold a slice in `Value`. Repeated carrier
 types are populated independently.
-Composite spot declarations must embed their spot carrier and intermediate
+Composite spot declarations must embed their spot base and intermediate
 wrappers by value. Compilation rejects pointer embeddings along that chain;
 `OptionalSpot.Value` still uses nil to represent an absent occurrence.
-An active cycle of the same marker and Subject types is rejected because it
+An active cycle of the same marker and carrier types is rejected because it
 would require an infinite expansion. Live Subject binding remains separate.
 
 ## Materialization
 
-`Materialize[S](charter, chart)` creates a Vessel with fresh zero-valued Subject
-root storage allocated by `new(S)`. To retain an existing Subject, supply its
+`Materialize[S](charter, chart)` creates a Vessel with a fresh zero-valued Subject
+allocated by `new(S)`. To retain an existing Subject, supply its
 pointer as the final argument; both generic parameters can then be inferred:
 
 ```go
@@ -144,8 +155,8 @@ It retains the supplied Charter, Chart, and Subject without copying them.
 `vessel.Subject` exposes the actual `*S`. Fresh Subjects are independent; supplied
 Subjects preserve their existing state and identity. Materialization does not
 allocate nested pointer fields, invoke Subject hooks, or perform framework
-composition. If S is itself a pointer type, fresh `new(S)` storage does not
-initialize its pointee; missing root storage is an error. Frameworks construct
+composition. If S is itself a pointer type, fresh `new(S)` leaves its pointee
+nil, which is an invalid Subject root. Frameworks construct
 and configure their own state before or after materialization as appropriate.
 
 `vessel.Traverse(traversal)` forwards Chart traversal to the retained Charter and
@@ -225,15 +236,15 @@ An **Encounter** records the arrival and its route context:
 - `LanePath()` is relative to the parent marker; `SpotPath()` is relative to the
   lane. Both return copied field-index paths. `ItemIndex()` gives the multi-spot
   slice index, zero for single/optional spots, or -1 at the root. These describe
-  Chart storage, independently of the marker's `SubjectPath()`.
+  positions in the Chart, independently of the marker's `CarrierPath()`.
 
 This slice requires a nonempty Course and visitor list. It does not provide crawling,
 descendant-search waypoints, movement controls, or live Subject traversal.
 
 ## Live binding
 
-`Bind[I](subject, marker)` resolves one populated marker against the live
-Subject and returns an ordinary Go interface receiver:
+`Bind[I](subject, marker)` finds the marker's carrier in the live Subject and
+returns an ordinary Go interface receiver:
 
 ```go
 command := &chart.EntryPoint.MainCommand.Value
@@ -248,9 +259,9 @@ if present {
 
 The root must be a nonnil pointer leading to the exact recorded root type;
 additional pointer wrappers are allowed. Sail follows the stored field path
-without allocating Subject storage or constructing addressable copies.
+without allocating Subject values or constructing addressable copies.
 Addressable concrete fields bind through their address when it implements I, preserving the
-connection to their original storage even for value-receiver interfaces.
+connection to their original carrier even for value-receiver interfaces.
 
 Interface fields expose their current dynamic receiver. A stored non-pointer
 value follows normal Go value semantics; if only its pointer implements I, an
@@ -258,8 +269,8 @@ addressability error is returned. Replacing a pointer or interface field require
 rebinding to obtain the replacement. Nil maps and slices remain valid values.
 
 `present == false` without an error means that the existing receiver does not
-implement I. Wrong roots, unpopulated or nil markers, missing pointer/interface
-storage, inaccessible receivers, and receiver cycles produce contextual errors.
+implement I. Wrong roots, unpopulated or nil markers, nil pointers or interfaces,
+inaccessible receivers, and receiver cycles produce contextual errors.
 I must be an interface; `Self` signature templates are not substituted into a
 runtime Go interface.
 
@@ -269,7 +280,7 @@ supply a marker to bind; cascading live Subject walking remains separate work.
 
 ## Acceptance
 
-A marker can constrain its receiving type with an optional declaration hook:
+A marker can constrain its carrier type with an optional declaration hook:
 
 ```go
 func (EnumOptionLandmark) Accept() legend.Acceptance {
@@ -292,7 +303,7 @@ Each declaration selects one rule:
   string types pass; pointers do not. Collection kinds impose no element
   constraints. `reflect.Invalid` and unknown kinds are invalid declarations.
 - `AcceptContract[I]()` requires an interface contract, using the same signature
-  matching as qualities. Pointer chains resolve to a receiving type T, preserving
+  matching as qualities. Pointer chains resolve to a carrier type T, preserving
   defined-type identity. Concrete types support methods on T or *T; interface
   declarations use their own method set. Direct `Self` parameters and results
   resolve to T, including when T is an interface. No surrogate is constructed
@@ -333,9 +344,9 @@ type. Compilation validates this contract before any Chart is populated.
 
 Omitting `barrel` means `barrel:"optional"`: an unavailable capability leaves
 the barrel empty. `barrel:"required"` instead makes absence a population error.
-Availability requires a concrete receiving type whose pointer implements the
-interface; this covers value and pointer methods. An interface-typed Subject
-field cannot supply a concrete surrogate from its static declaration alone.
+Availability requires a concrete carrier type whose pointer implements the
+interface; this covers value and pointer methods. An interface-typed carrier
+cannot supply a concrete surrogate from its static declaration alone.
 
 After the occurrence's fields and child lanes are populated, each barrel calls
 its selected method on a fresh zero-valued surrogate. Hooks must work without
@@ -375,29 +386,29 @@ type Remote string
 func (Remote) Default() Remote { return "origin" }
 ```
 
-For a Subject field `Remote Remote` marked with `arg,default`, population
+For a carrier declared `Remote Remote` and marked with `arg,default`, population
 requires and invokes `Default() Remote`. Without the qualifier, the quality
 stays inactive: no capability is required or invoked. This association comes
 from nesting, not from the symbol's meaning. Reusable qualifier wrappers retain
 the qualities declared along their embedded `Qualifier` path.
 
-`Self` matches the receiving type after pointer normalization, preserving
+`Self` matches the carrier type after pointer normalization, preserving
 defined-type identity. It is a signature placeholder, not a Go interface that
-the Subject type must literally implement. Sail checks the entire capability's
+the carrier type must literally implement. Sail checks the entire capability's
 method set. This slice supports Self directly in method parameters and results;
 compound uses such as `[]Self` and `*Self` fail compilation. Interfaces using
 Self must have exported methods. Ordinary interfaces use Go's implementation
 rules, including private methods.
 
 The selected `populate` method must be exported, take no arguments, and return
-one value. Fixed result types are checked for assignability to the storage type
+one value. Fixed result types are checked for assignability to the value type
 during compilation; Self results are checked during population. Self cannot be
-used as the storage type. With `any`, `arg.Default.Value.Get()` returns an
+used as the value type. With `any`, `arg.Default.Value.Get()` returns an
 interface containing the actual `Remote` value, not a converted string.
 
 Each active quality invokes its method on a fresh zero-valued surrogate, after
 the occurrence's fields and child lanes are populated. Missing or mismatched
-capabilities, incompatible storage, and hook panics fail population with the
+capabilities, incompatible result types, and hook panics fail population with the
 Subject and qualifier context. `Present()` distinguishes an inactive quality
 from a successful zero or nil result. Reading a quality never invokes or
 validates its value. Live-value parsing and validation remain separate.
@@ -425,8 +436,8 @@ rules as qualities. In this example, `value` contains a `Remote`, preserving its
 dynamic type.
 
 An unavailable or incompatible capability returns `present == false` without
-an error. This includes nil, cyclic pointer, and interface Subject types that
-cannot supply a surrogate. Invalid capability requests, incompatible storage,
+an error. This includes nil, cyclic pointer, and interface carrier types that
+cannot supply a surrogate. Invalid capability requests, incompatible result types,
 and hook panics return errors. A successful zero or nil result still returns
 `present == true`.
 

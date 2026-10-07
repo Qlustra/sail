@@ -25,21 +25,21 @@ const (
 // SpotShape keeps the target tied to the type held by Value. The sealed
 // provider is promoted by composite declarations without a public Target hook.
 type SpotShape struct {
-	Kind    SpotKind
-	Target  reflect.Type
-	Carrier reflect.Type
+	Kind   SpotKind
+	Target reflect.Type
+	Base   reflect.Type // Concrete spot type embedded by composite declarations.
 }
 
 func (SingleSpot[M]) spot() SpotShape {
-	return SpotShape{Kind: SingleSpotKind, Target: reflect.TypeFor[M](), Carrier: reflect.TypeFor[SingleSpot[M]]()}
+	return SpotShape{Kind: SingleSpotKind, Target: reflect.TypeFor[M](), Base: reflect.TypeFor[SingleSpot[M]]()}
 }
 
 func (OptionalSpot[M]) spot() SpotShape {
-	return SpotShape{Kind: OptionalSpotKind, Target: reflect.TypeFor[M](), Carrier: reflect.TypeFor[OptionalSpot[M]]()}
+	return SpotShape{Kind: OptionalSpotKind, Target: reflect.TypeFor[M](), Base: reflect.TypeFor[OptionalSpot[M]]()}
 }
 
 func (MultiSpot[M]) spot() SpotShape {
-	return SpotShape{Kind: MultiSpotKind, Target: reflect.TypeFor[M](), Carrier: reflect.TypeFor[MultiSpot[M]]()}
+	return SpotShape{Kind: MultiSpotKind, Target: reflect.TypeFor[M](), Base: reflect.TypeFor[MultiSpot[M]]()}
 }
 
 type SpotDeclaration interface {

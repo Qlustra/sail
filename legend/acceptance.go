@@ -6,7 +6,7 @@ import (
 	"github.com/qlustra/sail/internal/declaration"
 )
 
-// Acceptance declares a constraint on a marker's receiving type. Its contents
+// Acceptance declares a constraint on a marker's carrier type. Its contents
 // are immutable; returning the zero value from Accept is a compilation error.
 type Acceptance = declaration.Acceptance
 
@@ -21,13 +21,13 @@ func AcceptExact[T any]() Acceptance { return declaration.AcceptExact[T]() }
 func AcceptKind(kind reflect.Kind) Acceptance { return declaration.AcceptKind(kind) }
 
 // AcceptContract requires the interface contract I without invoking its methods.
-// Contract matching resolves Subject pointer chains, retaining defined-type
+// Contract matching resolves carrier pointer chains, retaining defined-type
 // identity. Concrete T supports methods on T or *T; interface declarations use
-// their own method set. Self refers to that resolved receiving type.
+// their own method set. Self refers to that resolved carrier type.
 // Invalid contracts fail compilation rather than panicking here.
 func AcceptContract[I any]() Acceptance { return declaration.AcceptContract[I]() }
 
-// AcceptanceProvider optionally constrains the Subject type for a Legend,
+// AcceptanceProvider optionally constrains the carrier type for a Legend,
 // Region, or Landmark. Accept follows the zero-value contract of Mark and runs
 // once per marker declaration type during compilation. The constraint supplements
 // the marker's role requirements and never participates in mark selection.

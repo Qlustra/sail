@@ -8,7 +8,7 @@ import (
 )
 
 // allocateDeclaration only initializes pointers along a selected declaration path.
-// Subject types are inspected, never allocated here.
+// Carrier types are inspected, never allocated here.
 func allocateDeclaration(value reflect.Value) (reflect.Value, error) {
 	if reflectutils.ResolvePointerChain(value.Type()) == nil {
 		return reflect.Value{}, fmt.Errorf("%v: cyclic declaration pointer type", value.Type())
@@ -40,7 +40,9 @@ func declarationField(value reflect.Value, path []int) (reflect.Value, error) {
 	return value, nil
 }
 
-func declarationCarrier(value reflect.Value, path []int) (reflect.Value, error) {
+// declarationValue resolves a concrete declaration value, initializing pointers
+// along its selected Chart path.
+func declarationValue(value reflect.Value, path []int) (reflect.Value, error) {
 	field, err := declarationField(value, path)
 	if err != nil {
 		return reflect.Value{}, err

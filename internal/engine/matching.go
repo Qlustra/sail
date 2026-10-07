@@ -20,7 +20,7 @@ type match struct {
 }
 
 // survey selects a descriptor by its compound mark among the caller's eligible
-// candidates. Lane advancement and receiving-type validation belong to traversal.
+// candidates. Lane advancement and carrier-type validation belong to traversal.
 // A nil match without an error means that no eligible candidate matched.
 func survey(field reflect.StructField, candidates []candidate, families markFamilies) (*match, error) {
 	parsedTags := make(map[string]parsedMarkTag)

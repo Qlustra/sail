@@ -56,7 +56,7 @@ func Select[T any](predicates ...func(T) bool) Waypoint {
 }
 
 // markerAs adapts an addressable Chart marker without allocating or following
-// Subject storage. Pointer-first matching keeps interface visitors attached
+// Subject values. Pointer-first matching keeps interface visitors attached
 // to the original marker; concrete value requests use ordinary Go copies.
 func markerAs[T any](value reflect.Value) (marker T, matches bool) {
 	if marker, matches = value.Addr().Interface().(T); matches {

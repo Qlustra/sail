@@ -29,7 +29,7 @@ func Populate(c *Charter, chart reflect.Value, subjectType reflect.Type) error {
 
 type populationKey struct {
 	descriptor  *markerDescriptor
-	subjectType reflect.Type
+	carrierType reflect.Type
 }
 
 type populator struct {
@@ -59,13 +59,13 @@ func (p *populator) populate(descriptor *markerDescriptor, value reflect.Value, 
 }
 
 func (p *populator) populateLanes(descriptor *markerDescriptor, value reflect.Value, source decl.Reference) error {
-	subjectType := reflectutils.ResolvePointerChain(source.Type)
-	if subjectType == nil || subjectType.Kind() != reflect.Struct {
-		return fmt.Errorf("%s: %v requires a subject declaration that resolves to a struct, got %v", source, descriptor.typ, source.Type)
+	carrierType := reflectutils.ResolvePointerChain(source.Type)
+	if carrierType == nil || carrierType.Kind() != reflect.Struct {
+		return fmt.Errorf("%s: %v requires a carrier type that resolves to a struct, got %v", source, descriptor.typ, source.Type)
 	}
-	key := populationKey{descriptor: descriptor, subjectType: subjectType}
+	key := populationKey{descriptor: descriptor, carrierType: carrierType}
 	if previous, exists := p.active[key]; exists {
-		return fmt.Errorf("%s: recursive population of %v against %v returns to %s", source, descriptor.typ, subjectType, previous)
+		return fmt.Errorf("%s: recursive population of %v against %v returns to %s", source, descriptor.typ, carrierType, previous)
 	}
 	p.active[key] = source
 	defer delete(p.active, key)
@@ -74,8 +74,8 @@ func (p *populator) populateLanes(descriptor *markerDescriptor, value reflect.Va
 	if err != nil {
 		return fmt.Errorf("%s: %w", source, err)
 	}
-	for i := 0; i < subjectType.NumField(); i++ {
-		field := subjectType.Field(i)
+	for i := 0; i < carrierType.NumField(); i++ {
+		field := carrierType.Field(i)
 		if _, marked := field.Tag.Lookup(descriptor.mark.tag); !marked {
 			continue
 		}

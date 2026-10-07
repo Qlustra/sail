@@ -1,4 +1,5 @@
-// Package declaration owns Legend carriers and their sealed engine protocols.
+// Package declaration owns Legend declaration types, populated Chart values,
+// carrier references, and their sealed engine protocols.
 package declaration
 
 type marker struct {

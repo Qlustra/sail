@@ -31,7 +31,7 @@ func (p *lanePopulation) enter() error {
 		return nil
 	}
 	lane := p.descriptor.lanes[p.index]
-	value, err := declarationCarrier(p.value, lane.declarationPath)
+	value, err := declarationValue(p.value, lane.declarationPath)
 	if err != nil {
 		return fmt.Errorf("%v.%s: %w", p.descriptor.typ, p.descriptor.laneName(p.index), err)
 	}

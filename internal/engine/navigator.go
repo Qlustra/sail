@@ -10,7 +10,7 @@ import (
 )
 
 // Occurrence retains one populated marker and its position in the Chart.
-// Descriptors are shared; occurrence identity belongs to existing Chart storage.
+// Descriptors are shared; occurrence identity belongs to existing Chart values.
 type Occurrence struct {
 	Value      reflect.Value
 	Source     decl.Reference
@@ -42,16 +42,16 @@ func markerOccurrence(descriptor *markerDescriptor, value reflect.Value) (*Occur
 		return nil, fmt.Errorf("marker type %v does not match charter declaration %v", value.Type(), descriptor.typ)
 	}
 	if !value.CanAddr() || !value.CanInterface() {
-		return nil, fmt.Errorf("marker %v requires addressable Chart storage", descriptor.typ)
+		return nil, fmt.Errorf("marker %v requires an addressable Chart value", descriptor.typ)
 	}
-	carrier, err := reflectutils.FieldByPath(value, descriptor.carrierPath)
+	base, err := reflectutils.FieldByPath(value, descriptor.basePath)
 	if err == nil {
-		carrier, err = reflectutils.Dereference(carrier)
+		base, err = reflectutils.Dereference(base)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("marker %v: %w", descriptor.typ, err)
 	}
-	source := decl.ReferenceOf(carrier.Interface())
+	source := decl.ReferenceOf(base.Interface())
 	if source.Root == nil || source.Type == nil {
 		return nil, fmt.Errorf("marker %v has not been populated", descriptor.typ)
 	}
@@ -60,7 +60,7 @@ func markerOccurrence(descriptor *markerDescriptor, value reflect.Value) (*Occur
 }
 
 // immediateChildren follows only lane and spot descriptors. It neither reads
-// live Subject storage nor allocates missing Chart carriers.
+// live Subject values nor allocates missing Chart values.
 func immediateChildren(parent *Occurrence) ([]*Occurrence, error) {
 	var children []*Occurrence
 	for _, lane := range parent.descriptor.lanes {

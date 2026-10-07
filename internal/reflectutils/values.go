@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-// Dereference follows existing pointer storage without allocating missing values.
+// Dereference follows existing pointers without allocating missing values.
 // Interfaces remain intact because their dynamic value is not a declared path.
 func Dereference(value reflect.Value) (reflect.Value, error) {
 	if !value.IsValid() {
@@ -16,14 +16,14 @@ func Dereference(value reflect.Value) (reflect.Value, error) {
 	}
 	for value.Kind() == reflect.Pointer {
 		if value.IsNil() {
-			return reflect.Value{}, fmt.Errorf("missing storage: nil %v", value.Type())
+			return reflect.Value{}, fmt.Errorf("cannot dereference nil pointer of type %v", value.Type())
 		}
 		value = value.Elem()
 	}
 	return value, nil
 }
 
-// FieldByPath follows exported fields through existing pointer storage. The
+// FieldByPath follows exported fields through existing pointers. The
 // final field is returned with its declared type, including pointers/interfaces.
 func FieldByPath(value reflect.Value, path []int) (reflect.Value, error) {
 	for _, index := range path {
@@ -42,12 +42,12 @@ func FieldByPath(value reflect.Value, path []int) (reflect.Value, error) {
 		value = value.Field(index)
 	}
 	if !value.IsValid() || !value.CanInterface() {
-		return reflect.Value{}, fmt.Errorf("field storage is inaccessible")
+		return reflect.Value{}, fmt.Errorf("field value is inaccessible")
 	}
 	return value, nil
 }
 
-// BindInterface obtains an ordinary Go interface from existing storage. It
+// BindInterface obtains an ordinary Go interface from an existing value. It
 // prefers an addressable concrete value's address and never creates a copy to
 // supply pointer methods. Interfaces expose their current dynamic receiver.
 func BindInterface[I any](value reflect.Value) (receiver I, present bool, err error) {
@@ -62,18 +62,18 @@ func BindInterface[I any](value reflect.Value) (receiver I, present bool, err er
 	seen := make(map[pointer]bool)
 	for {
 		if !value.IsValid() || !value.CanInterface() {
-			return receiver, false, fmt.Errorf("receiver storage is inaccessible")
+			return receiver, false, fmt.Errorf("receiver is inaccessible")
 		}
 		switch value.Kind() {
 		case reflect.Interface:
 			if value.IsNil() {
-				return receiver, false, fmt.Errorf("missing storage: nil %v", value.Type())
+				return receiver, false, fmt.Errorf("cannot bind nil interface of type %v", value.Type())
 			}
 			value = value.Elem()
 			continue
 		case reflect.Pointer:
 			if value.IsNil() {
-				return receiver, false, fmt.Errorf("missing storage: nil %v", value.Type())
+				return receiver, false, fmt.Errorf("cannot bind nil pointer of type %v", value.Type())
 			}
 			key := pointer{typ: value.Type(), address: value.Pointer()}
 			if seen[key] {
@@ -95,7 +95,7 @@ func BindInterface[I any](value reflect.Value) (receiver I, present bool, err er
 			return receiver, true, nil
 		}
 		if reflect.PointerTo(value.Type()).Implements(contract) {
-			return receiver, false, fmt.Errorf("%v requires addressable storage to bind %v", value.Type(), contract)
+			return receiver, false, fmt.Errorf("%v requires an addressable value to bind %v", value.Type(), contract)
 		}
 		return receiver, false, nil
 	}

@@ -15,7 +15,7 @@ func (b Barrel[V, I]) Present() bool { return b.present }
 type BarrelShape struct {
 	Value      reflect.Type
 	Capability reflect.Type
-	Carrier    reflect.Type
+	Base       reflect.Type // Concrete Barrel type embedded by composite declarations.
 }
 
 // The sealed shape keeps both generic arguments available to compilation.
@@ -24,7 +24,7 @@ func (*Barrel[V, I]) barrel() BarrelShape {
 	return BarrelShape{
 		Value:      reflect.TypeFor[V](),
 		Capability: reflect.TypeFor[I](),
-		Carrier:    reflect.TypeFor[Barrel[V, I]](),
+		Base:       reflect.TypeFor[Barrel[V, I]](),
 	}
 }
 

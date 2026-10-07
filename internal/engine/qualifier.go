@@ -55,9 +55,9 @@ func compileQualifier(field reflect.StructField) (qualifierDescriptor, error) {
 	}, nil
 }
 
-// collectQualities follows the chosen qualifier carrier's embedding path, so
+// collectQualities follows the chosen qualifier base's embedding path, so
 // both a reusable qualifier and wrappers around it can declare requirements.
-func collectQualities(typ reflect.Type, prefix, carrier []int) ([]qualityDescriptor, error) {
+func collectQualities(typ reflect.Type, prefix, basePath []int) ([]qualityDescriptor, error) {
 	var result []qualityDescriptor
 	for {
 		for i := 0; i < typ.NumField(); i++ {
@@ -79,23 +79,23 @@ func collectQualities(typ reflect.Type, prefix, carrier []int) ([]qualityDescrip
 			declaration.declarationPath = slices.Concat(prefix, declaration.declarationPath)
 			result = append(result, declaration)
 		}
-		if len(carrier) == 0 {
+		if len(basePath) == 0 {
 			return result, nil
 		}
-		field := typ.Field(carrier[0])
+		field := typ.Field(basePath[0])
 		typ = reflectutils.ResolvePointerChain(field.Type)
 		prefix = slices.Concat(prefix, field.Index)
-		carrier = carrier[1:]
+		basePath = basePath[1:]
 	}
 }
 
-func (d *markerDescriptor) populateQualities(value reflect.Value, receivingType reflect.Type, symbols []string) error {
+func (d *markerDescriptor) populateQualities(value reflect.Value, carrierType reflect.Type, symbols []string) error {
 	for _, qualifier := range d.qualifiers {
 		if !slices.Contains(symbols, qualifier.symbol) {
 			continue
 		}
 		for _, quality := range qualifier.qualities {
-			if err := quality.populate(value, receivingType); err != nil {
+			if err := quality.populate(value, carrierType); err != nil {
 				return fmt.Errorf("%v.%s.%s (qualifier %q): %w", d.typ, qualifier.name, quality.name, qualifier.symbol, err)
 			}
 		}

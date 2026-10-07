@@ -7,7 +7,7 @@ import (
 	"github.com/qlustra/sail/internal/declaration"
 )
 
-// Contract retains the interface as a signature template. Subject types
+// Contract retains the interface as a signature template. Carrier types
 // need not implement that literal interface when it contains Self.
 type Contract struct {
 	typ       reflect.Type
@@ -95,54 +95,54 @@ func ContainsSelf(typ reflect.Type, seen map[reflect.Type]bool) bool {
 // Type returns the declared capability interface.
 func (c Contract) Type() reflect.Type { return c.typ }
 
-// Match checks the receiving type against the compiled contract.
-func (c Contract) Match(receivingType reflect.Type) error {
-	receiver := receivingType
+// Match checks the carrier type against the compiled contract.
+func (c Contract) Match(carrierType reflect.Type) error {
+	receiver := carrierType
 	receiverInputs := 0
-	if receivingType.Kind() != reflect.Interface {
-		receiver = reflect.PointerTo(receivingType)
+	if carrierType.Kind() != reflect.Interface {
+		receiver = reflect.PointerTo(carrierType)
 		receiverInputs = 1
 	}
 	if !c.templated {
 		if !receiver.Implements(c.typ) {
-			return fmt.Errorf("%v requires capability %v", receivingType, c.typ)
+			return fmt.Errorf("%v requires capability %v", carrierType, c.typ)
 		}
 		return nil
 	}
 	for _, expected := range c.methods {
 		actual, exists := receiver.MethodByName(expected.Name)
 		if !exists {
-			return fmt.Errorf("%v requires capability %v: missing method %s", receivingType, c.typ, expected.Name)
+			return fmt.Errorf("%v requires capability %v: missing method %s", carrierType, c.typ, expected.Name)
 		}
-		if !matchesCapabilitySignature(actual.Type, expected.Type, receivingType, receiverInputs) {
-			return fmt.Errorf("%v.%s has signature %v, expected %v with Self = %v", receivingType, expected.Name, actual.Type, expected.Type, receivingType)
+		if !matchesCapabilitySignature(actual.Type, expected.Type, carrierType, receiverInputs) {
+			return fmt.Errorf("%v.%s has signature %v, expected %v with Self = %v", carrierType, expected.Name, actual.Type, expected.Type, carrierType)
 		}
 	}
 	return nil
 }
 
-func matchesCapabilitySignature(actual, expected, receivingType reflect.Type, receiverInputs int) bool {
+func matchesCapabilitySignature(actual, expected, carrierType reflect.Type, receiverInputs int) bool {
 	// Concrete methods include their receiver; interface methods do not.
 	if actual.NumIn() != expected.NumIn()+receiverInputs || actual.NumOut() != expected.NumOut() || actual.IsVariadic() != expected.IsVariadic() {
 		return false
 	}
 	for i := 0; i < expected.NumIn(); i++ {
-		if actual.In(i+receiverInputs) != ResolveSelf(expected.In(i), receivingType) {
+		if actual.In(i+receiverInputs) != ResolveSelf(expected.In(i), carrierType) {
 			return false
 		}
 	}
 	for i := 0; i < expected.NumOut(); i++ {
-		if actual.Out(i) != ResolveSelf(expected.Out(i), receivingType) {
+		if actual.Out(i) != ResolveSelf(expected.Out(i), carrierType) {
 			return false
 		}
 	}
 	return true
 }
 
-// ResolveSelf substitutes the receiving type for a direct Self placeholder.
-func ResolveSelf(typ, receivingType reflect.Type) reflect.Type {
+// ResolveSelf substitutes the carrier type for a direct Self placeholder.
+func ResolveSelf(typ, carrierType reflect.Type) reflect.Type {
 	if typ == reflect.TypeFor[declaration.Self]() {
-		return receivingType
+		return carrierType
 	}
 	return typ
 }

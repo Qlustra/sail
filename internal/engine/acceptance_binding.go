@@ -54,23 +54,23 @@ func compileAcceptance(spec decl.Acceptance) (acceptance, error) {
 	return compiled, nil
 }
 
-func (a acceptance) match(receivingType reflect.Type) error {
+func (a acceptance) match(carrierType reflect.Type) error {
 	switch a.rule.Mode {
 	case decl.Exact:
-		if receivingType != a.rule.Type {
-			return fmt.Errorf("expected exactly %v, got %v", a.rule.Type, receivingType)
+		if carrierType != a.rule.Type {
+			return fmt.Errorf("expected exactly %v, got %v", a.rule.Type, carrierType)
 		}
 	case decl.Kind:
-		if receivingType.Kind() != a.rule.Kind {
-			return fmt.Errorf("expected kind %v, got %v (kind %v)", a.rule.Kind, receivingType, receivingType.Kind())
+		if carrierType.Kind() != a.rule.Kind {
+			return fmt.Errorf("expected kind %v, got %v (kind %v)", a.rule.Kind, carrierType, carrierType.Kind())
 		}
 	case decl.Contract:
-		typ := reflectutils.ResolvePointerChain(receivingType)
+		typ := reflectutils.ResolvePointerChain(carrierType)
 		if typ == nil {
-			return fmt.Errorf("cannot resolve receiving type %v for contract %v", receivingType, a.contract.Type())
+			return fmt.Errorf("cannot resolve carrier type %v for contract %v", carrierType, a.contract.Type())
 		}
 		if err := a.contract.Match(typ); err != nil {
-			return fmt.Errorf("expected contract %v, got %v: %w", a.contract.Type(), receivingType, err)
+			return fmt.Errorf("expected contract %v, got %v: %w", a.contract.Type(), carrierType, err)
 		}
 	}
 	return nil

@@ -8,7 +8,7 @@ type familyMarker interface {
 }
 
 // SingleSpot describes exactly one occurrence of M, a non-pointer marker struct.
-// Composite spot declarations must embed their spot carrier and intermediate
+// Composite spot declarations must embed their spot base and intermediate
 // wrappers by value; pointer embeddings are rejected during compilation.
 type SingleSpot[M familyMarker] = declaration.SingleSpot[M]
 

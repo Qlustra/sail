@@ -18,7 +18,7 @@ type Vessel[S any, L legend.Declaration] struct {
 }
 
 // Materialize creates a Vessel from a compiled Charter and populated Chart.
-// Omitting subject allocates fresh zero-valued root storage with new(S).
+// Omitting subject allocates a fresh zero-valued Subject with new(S).
 // Supplying one nonnil pointer retains that exact Subject, without copying it.
 // More than one pointer, explicit nil, or an incompatible association is an error.
 // Materialization does not allocate nested pointers or invoke Subject hooks;

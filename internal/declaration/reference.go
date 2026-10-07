@@ -8,21 +8,24 @@ import (
 	"github.com/qlustra/sail/internal/reflectutils"
 )
 
-// Reference belongs to one populated marker, not its shared descriptor.
+// Reference identifies a carrier in a Subject declaration. It belongs to one
+// populated marker, not its shared descriptor.
 type Reference struct {
-	Root reflect.Type
-	Type reflect.Type
-	Path []int
+	Root reflect.Type // Subject root type.
+	Type reflect.Type // Original declared carrier type.
+	Path []int        // Field-index path from the Subject root to the carrier.
 }
 
-func (m marker) subjectReference() Reference { return m.source }
+func (m marker) carrierReference() Reference { return m.source }
 
-// SubjectType returns the declared Subject type described by this marker.
-// It is nil until the marker has been populated.
-func (m marker) SubjectType() reflect.Type { return m.source.Type }
+// CarrierType returns the original declared type of the Subject field represented
+// by this marker, or the Subject root type for the root Legend. It is nil until
+// the marker has been populated. Pointer types are not normalized.
+func (m marker) CarrierType() reflect.Type { return m.source.Type }
 
-// SubjectPath returns a copy of the field-index path from the Subject root.
-func (m marker) SubjectPath() []int { return slices.Clone(m.source.Path) }
+// CarrierPath returns a copy of the field-index path from the Subject root to
+// this marker's carrier. The root Legend has an empty path.
+func (m marker) CarrierPath() []int { return slices.Clone(m.source.Path) }
 
 func (r Reference) Child(field reflect.StructField) Reference {
 	return Reference{Root: r.Root, Type: field.Type, Path: slices.Concat(r.Path, field.Index)}
@@ -41,12 +44,13 @@ func (r Reference) String() string {
 	return result.String()
 }
 
-// SetSource receives the concrete carrier selected by the engine.
-func SetSource(carrier any, source Reference) {
-	carrier.(interface{ setSource(Reference) }).setSource(source)
+// SetSource records a carrier reference in the embedded declaration base
+// selected by the engine.
+func SetSource(base any, source Reference) {
+	base.(interface{ setSource(Reference) }).setSource(source)
 }
 
 // ReferenceOf bypasses public accessors which a composite may shadow.
-func ReferenceOf(carrier any) Reference {
-	return carrier.(interface{ subjectReference() Reference }).subjectReference()
+func ReferenceOf(base any) Reference {
+	return base.(interface{ carrierReference() Reference }).carrierReference()
 }

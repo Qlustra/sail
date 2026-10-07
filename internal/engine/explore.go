@@ -12,7 +12,7 @@ import (
 
 type spotDescriptor struct {
 	declarationPath []int
-	valuePath       []int // Path inside the spot declaration to its carrier's Value.
+	valuePath       []int // Path inside the spot declaration to its embedded base's Value.
 	kind            decl.SpotKind
 	cardinality     cardinality
 	target          *markerDescriptor
@@ -208,12 +208,12 @@ func (e *explorer) collectSpots(t reflect.Type) ([]spotDescriptor, error) {
 		if shape.Target == nil || shape.Target.Kind() != reflect.Struct {
 			return nil, fmt.Errorf("%v.%s: spot target %v must be a non-pointer marker struct", t, field.Name, shape.Target)
 		}
-		carrier, err := reflectutils.EmbeddedPath(spotType, shape.Carrier)
+		basePath, err := reflectutils.EmbeddedPath(spotType, shape.Base)
 		if err != nil {
 			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
 		}
-		// Look up Value on the sealed carrier, never on a composite wrapper.
-		valueField, _ := shape.Carrier.FieldByName("Value")
+		// Look up Value on the sealed spot base, never on a composite wrapper.
+		valueField, _ := shape.Base.FieldByName("Value")
 		cardinality, err := compileCardinality(shape.Kind, field.Tag)
 		if err != nil {
 			return nil, fmt.Errorf("%v.%s: %w", t, field.Name, err)
@@ -227,7 +227,7 @@ func (e *explorer) collectSpots(t reflect.Type) ([]spotDescriptor, error) {
 		}
 		result = append(result, spotDescriptor{
 			declarationPath: append([]int(nil), field.Index...),
-			valuePath:       slices.Concat(carrier, valueField.Index),
+			valuePath:       slices.Concat(basePath, valueField.Index),
 			kind:            shape.Kind,
 			cardinality:     cardinality,
 			target:          targetDescriptor,

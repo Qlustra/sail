@@ -52,7 +52,7 @@ func compileBarrel(field reflect.StructField) (barrelDescriptor, error) {
 	if err != nil {
 		return barrelDescriptor{}, err
 	}
-	path, err := reflectutils.EmbeddedPath(typ, shape.Carrier)
+	path, err := reflectutils.EmbeddedPath(typ, shape.Base)
 	if err != nil {
 		return barrelDescriptor{}, err
 	}
@@ -98,26 +98,26 @@ func readBarrelRequirement(structTags reflect.StructTag) (bool, error) {
 	return false, fmt.Errorf("invalid barrel requirement %q: expected optional or required", format.Raw)
 }
 
-func (d *markerDescriptor) populateBarrels(value reflect.Value, receivingType reflect.Type) error {
+func (d *markerDescriptor) populateBarrels(value reflect.Value, carrierType reflect.Type) error {
 	for _, barrel := range d.barrels {
-		if err := barrel.populate(value, receivingType); err != nil {
+		if err := barrel.populate(value, carrierType); err != nil {
 			return fmt.Errorf("%v.%s: %w", d.typ, barrel.name, err)
 		}
 	}
 	return nil
 }
 
-func (b barrelDescriptor) populate(value reflect.Value, receivingType reflect.Type) error {
-	destination, err := declarationCarrier(value, b.declarationPath)
+func (b barrelDescriptor) populate(value reflect.Value, carrierType reflect.Type) error {
+	destination, err := declarationValue(value, b.declarationPath)
 	if err != nil {
 		return err
 	}
-	typ := reflectutils.ResolvePointerChain(receivingType)
+	typ := reflectutils.ResolvePointerChain(carrierType)
 	// An interface declaration has no concrete implementation to instantiate.
 	// Pointer cycles likewise cannot supply a declaration surrogate.
 	if typ == nil || typ.Kind() == reflect.Interface || !reflect.PointerTo(typ).Implements(b.capability) {
 		if b.required {
-			return fmt.Errorf("required barrel: %v cannot supply a declaration surrogate for %v.%s", receivingType, b.capability, b.method.Name)
+			return fmt.Errorf("required barrel: %v cannot supply a declaration surrogate for %v.%s", carrierType, b.capability, b.method.Name)
 		}
 		return nil
 	}

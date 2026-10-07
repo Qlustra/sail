@@ -18,7 +18,7 @@ func validateSpotEmbeddings(typ reflect.Type) error {
 			continue
 		}
 		if field.Type.Kind() == reflect.Pointer {
-			return fmt.Errorf("%v.%s: spot carriers must be embedded by value, not pointer", typ, field.Name)
+			return fmt.Errorf("%v.%s: spot declarations must be embedded by value, not pointer", typ, field.Name)
 		}
 		if err := validateSpotEmbeddings(field.Type); err != nil {
 			return fmt.Errorf("%v.%s: %w", typ, field.Name, err)

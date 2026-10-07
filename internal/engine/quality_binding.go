@@ -35,7 +35,7 @@ func compileQuality(field reflect.StructField) (qualityDescriptor, error) {
 	if err != nil {
 		return qualityDescriptor{}, err
 	}
-	path, err := reflectutils.EmbeddedPath(typ, shape.Carrier)
+	path, err := reflectutils.EmbeddedPath(typ, shape.Base)
 	if err != nil {
 		return qualityDescriptor{}, err
 	}
@@ -46,16 +46,16 @@ func compileQuality(field reflect.StructField) (qualityDescriptor, error) {
 	}, nil
 }
 
-func (q qualityDescriptor) populate(value reflect.Value, receivingType reflect.Type) error {
-	receiver, err := q.reader.Resolve(receivingType)
+func (q qualityDescriptor) populate(value reflect.Value, carrierType reflect.Type) error {
+	resolvedType, err := q.reader.Resolve(carrierType)
 	if err != nil {
 		return fmt.Errorf("required quality: %w", err)
 	}
-	destination, err := declarationCarrier(value, q.declarationPath)
+	destination, err := declarationValue(value, q.declarationPath)
 	if err != nil {
 		return err
 	}
-	result, err := q.reader.Read(receiver)
+	result, err := q.reader.Read(resolvedType)
 	if err != nil {
 		return err
 	}

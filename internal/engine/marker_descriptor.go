@@ -23,15 +23,15 @@ const (
 // Lane and spot descriptors arrange its children; subject metadata belongs
 // to populated markers in a chart.
 type markerDescriptor struct {
-	typ         reflect.Type
-	role        markerRole
-	mark        mark
-	acceptance  acceptance
-	qualifiers  []qualifierDescriptor
-	features    []featureDescriptor
-	barrels     []barrelDescriptor
-	lanes       []laneDescriptor
-	carrierPath []int
+	typ        reflect.Type
+	role       markerRole
+	mark       mark
+	acceptance acceptance
+	qualifiers []qualifierDescriptor
+	features   []featureDescriptor
+	barrels    []barrelDescriptor
+	lanes      []laneDescriptor
+	basePath   []int
 }
 
 type featureDescriptor struct {
@@ -42,14 +42,14 @@ type featureDescriptor struct {
 // newMarkerDescriptor starts a local description; the explorer records it only after
 // its fields, mark, and acceptance have passed validation.
 func newMarkerDescriptor(t reflect.Type, role markerRole) (*markerDescriptor, error) {
-	path, err := reflectutils.EmbeddedPath(t, role.carrier())
+	path, err := reflectutils.EmbeddedPath(t, role.baseType())
 	if err != nil {
 		return nil, err
 	}
-	return &markerDescriptor{typ: t, role: role, carrierPath: path}, nil
+	return &markerDescriptor{typ: t, role: role, basePath: path}, nil
 }
 
-func (role markerRole) carrier() reflect.Type {
+func (role markerRole) baseType() reflect.Type {
 	switch role {
 	case legendRole:
 		return reflect.TypeFor[decl.Legend]()

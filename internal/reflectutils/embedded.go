@@ -9,7 +9,7 @@ import (
 // EmbeddedPath follows anonymous embeddings to the requested embedded type.
 // Breadth-first discovery follows promotion depth without relying on public
 // member names, which a composite declaration may shadow.
-func EmbeddedPath(typ, carrier reflect.Type) ([]int, error) {
+func EmbeddedPath(typ, target reflect.Type) ([]int, error) {
 	type embedding struct {
 		typ  reflect.Type
 		path []int
@@ -21,7 +21,7 @@ func EmbeddedPath(typ, carrier reflect.Type) ([]int, error) {
 		var found [][]int
 		var next []embedding
 		for _, entry := range level {
-			if entry.typ == carrier {
+			if entry.typ == target {
 				found = append(found, entry.path)
 				continue
 			}
@@ -45,9 +45,9 @@ func EmbeddedPath(typ, carrier reflect.Type) ([]int, error) {
 			return found[0], nil
 		}
 		if len(found) > 1 {
-			return nil, fmt.Errorf("%v: ambiguous embedded type %v", typ, carrier)
+			return nil, fmt.Errorf("%v: ambiguous embedded type %v", typ, target)
 		}
 		level = next
 	}
-	return nil, fmt.Errorf("%v: missing embedded type %v", typ, carrier)
+	return nil, fmt.Errorf("%v: missing embedded type %v", typ, target)
 }
