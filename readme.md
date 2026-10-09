@@ -511,14 +511,34 @@ Each declaration selects one rule:
 - `AcceptKind(reflect.String)` compares the original declared kind. Defined
   string types pass; pointers do not. Collection kinds impose no element
   constraints. `reflect.Invalid` and unknown kinds are invalid declarations.
-- `AcceptContract[I]()` requires an interface contract, using the same signature
-  matching as qualities. Pointer chains resolve to a carrier type T, preserving
-  defined-type identity. Concrete types support methods on T or *T; interface
-  declarations use their own method set. Direct `Self` parameters and results
-  resolve to T, including when T is an interface. No surrogate is constructed
-  and no Subject method is invoked. Non-interface contracts and unsupported
-  `Self` signatures fail compilation. Barrels and qualities still require
-  concrete receivers for invocation.
+- `AcceptContract[C]()` requires an interface contract or a struct's complete
+  exported method set. A struct template includes methods on C and *C; pointer
+  templates resolve to their struct type. Candidates may add methods, but must
+  preserve every required method's parameter and result types and variadicness.
+  Receivers, struct fields, and private concrete methods are not compared.
+  Embedding the struct supplies its methods unless a field or incompatible
+  override shadows them. Interface contracts retain Go's implementation rules,
+  including private methods, and use the same `Self` matching as qualities.
+  Carrier pointer chains resolve to a type T, preserving defined-type identity.
+  Concrete carriers support methods on T or *T; interface declarations use their
+  own method set. Direct `Self` parameters and results resolve to T, including
+  when T is an interface. No surrogate is constructed and no Subject method is
+  invoked. Contracts other than interfaces or structs and unsupported `Self`
+  signatures fail compilation. Barrels and qualities still require interface
+  contracts and concrete receivers for invocation.
+
+For example, a struct template can require a carrier's full public API while
+allowing extensions through embedding:
+
+```go
+func (FileLandmark) Accept() legend.Acceptance {
+	return legend.AcceptContract[File]()
+}
+
+type CustomFile struct {
+	File
+}
+```
 
 Population checks acceptance before filling that occurrence's metadata,
 descending, or invoking its capabilities. Legends and regions must still resolve

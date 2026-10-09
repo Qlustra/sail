@@ -5,10 +5,11 @@ import (
 	"reflect"
 
 	"github.com/qlustra/sail/internal/declaration"
+	"github.com/qlustra/sail/internal/reflectutils"
 )
 
-// Contract retains the interface as a signature template. Carrier types
-// need not implement that literal interface when it contains Self.
+// Contract retains an interface or a concrete type's public method signatures.
+// Carrier types need not implement a literal interface when it contains Self.
 type Contract struct {
 	typ       reflect.Type
 	methods   []reflect.Method
@@ -22,15 +23,9 @@ func CompileContract(typ reflect.Type) (Contract, error) {
 		return contract, fmt.Errorf("capability %v must be an interface", typ)
 	}
 	for i := 0; i < typ.NumMethod(); i++ {
-		method := typ.Method(i)
-		for _, slot := range signatureTypes(method.Type) {
-			if slot == reflect.TypeFor[declaration.Self]() {
-				contract.templated = true
-			} else if ContainsSelf(slot, make(map[reflect.Type]bool)) {
-				return contract, fmt.Errorf("%v.%s: Self must be a direct parameter or result, not part of %v", typ, method.Name, slot)
-			}
+		if err := contract.addMethod(typ.Method(i)); err != nil {
+			return contract, err
 		}
-		contract.methods = append(contract.methods, method)
 	}
 	// Reflection exposes only exported concrete methods. Ordinary interfaces
 	// still use Go's Implements check, including their private methods.
@@ -42,6 +37,49 @@ func CompileContract(typ reflect.Type) (Contract, error) {
 		}
 	}
 	return contract, nil
+}
+
+// CompileAcceptanceContract also permits a struct to supply its complete
+// exported method set, including pointer-receiver methods. Receiver types do
+// not participate in signature matching; parameter and result types do.
+func CompileAcceptanceContract(typ reflect.Type) (Contract, error) {
+	if typ.Kind() == reflect.Interface {
+		return CompileContract(typ)
+	}
+	contract := Contract{typ: typ}
+	resolved := reflectutils.ResolvePointerChain(typ)
+	if resolved == nil || resolved.Kind() != reflect.Struct {
+		return contract, fmt.Errorf("acceptance contract %v must be an interface or struct", typ)
+	}
+	receiver := reflect.PointerTo(resolved)
+	for i := 0; i < receiver.NumMethod(); i++ {
+		method := receiver.Method(i)
+		inputs := make([]reflect.Type, method.Type.NumIn()-1)
+		for i := range inputs {
+			inputs[i] = method.Type.In(i + 1)
+		}
+		outputs := make([]reflect.Type, method.Type.NumOut())
+		for i := range outputs {
+			outputs[i] = method.Type.Out(i)
+		}
+		method.Type = reflect.FuncOf(inputs, outputs, method.Type.IsVariadic())
+		if err := contract.addMethod(method); err != nil {
+			return contract, err
+		}
+	}
+	return contract, nil
+}
+
+func (c *Contract) addMethod(method reflect.Method) error {
+	for _, slot := range signatureTypes(method.Type) {
+		if slot == reflect.TypeFor[declaration.Self]() {
+			c.templated = true
+		} else if ContainsSelf(slot, make(map[reflect.Type]bool)) {
+			return fmt.Errorf("%v.%s: Self must be a direct parameter or result, not part of %v", c.typ, method.Name, slot)
+		}
+	}
+	c.methods = append(c.methods, method)
+	return nil
 }
 
 func signatureTypes(signature reflect.Type) []reflect.Type {
@@ -92,7 +130,7 @@ func ContainsSelf(typ reflect.Type, seen map[reflect.Type]bool) bool {
 	return false
 }
 
-// Type returns the declared capability interface.
+// Type returns the declared contract template.
 func (c Contract) Type() reflect.Type { return c.typ }
 
 // Match checks the carrier type against the compiled contract.
@@ -103,7 +141,7 @@ func (c Contract) Match(carrierType reflect.Type) error {
 		receiver = reflect.PointerTo(carrierType)
 		receiverInputs = 1
 	}
-	if !c.templated {
+	if c.typ.Kind() == reflect.Interface && !c.templated {
 		if !receiver.Implements(c.typ) {
 			return fmt.Errorf("%v requires capability %v", carrierType, c.typ)
 		}

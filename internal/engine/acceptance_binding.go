@@ -43,7 +43,7 @@ func compileAcceptance(spec decl.Acceptance) (acceptance, error) {
 			return acceptance{}, fmt.Errorf("invalid acceptance kind %v", rule.Kind)
 		}
 	case decl.Contract:
-		contract, err := capability.CompileContract(rule.Type)
+		contract, err := capability.CompileAcceptanceContract(rule.Type)
 		if err != nil {
 			return acceptance{}, err
 		}

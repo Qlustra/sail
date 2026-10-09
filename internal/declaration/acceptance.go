@@ -24,8 +24,8 @@ func AcceptKind(kind reflect.Kind) Acceptance {
 	return Acceptance{mode: Kind, kind: kind}
 }
 
-func AcceptContract[I any]() Acceptance {
-	return Acceptance{mode: Contract, typ: reflect.TypeFor[I]()}
+func AcceptContract[T any]() Acceptance {
+	return Acceptance{mode: Contract, typ: reflect.TypeFor[T]()}
 }
 
 type AcceptanceProvider interface {
