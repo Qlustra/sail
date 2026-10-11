@@ -39,6 +39,22 @@ func CompileContract(typ reflect.Type) (Contract, error) {
 	return contract, nil
 }
 
+// CompileNativeContract accepts only ordinary Go interfaces, whose matching
+// uses Implements directly without substituting Self or comparing signatures.
+func CompileNativeContract(typ reflect.Type) (Contract, error) {
+	if typ == nil {
+		return Contract{}, fmt.Errorf("contract type must not be nil")
+	}
+	contract, err := CompileContract(typ)
+	if err != nil {
+		return Contract{}, err
+	}
+	if contract.templated {
+		return Contract{}, fmt.Errorf("contract %v must be an ordinary Go interface; Self is unsupported", typ)
+	}
+	return contract, nil
+}
+
 // CompileAcceptanceContract also permits a struct to supply its complete
 // exported method set, including pointer-receiver methods. Receiver types do
 // not participate in signature matching; parameter and result types do.

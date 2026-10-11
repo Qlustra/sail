@@ -526,6 +526,14 @@ Each declaration selects one rule:
   invoked. Contracts other than interfaces or structs and unsupported `Self`
   signatures fail compilation. Barrels and qualities still require interface
   contracts and concrete receivers for invocation.
+- `AcceptContractFamily[Family]()` asks a zero-valued family descriptor for the
+  carrier's instantiated native interface contract. `Family` must be a concrete
+  non-pointer struct implementing `ContractFamily[Carrier]`; Go infers `Carrier`
+  from its `ContractOf` parameter. `Carrier` and the returned contract must be
+  ordinary Go interfaces, without `Self` templates. Population first checks the
+  provider interface, then invokes `ContractOf` with a fresh zero-valued concrete
+  carrier and checks its full returned interface using Go's implementation rules.
+  Interface-typed carrier declarations cannot supply a concrete witness.
 
 For example, a struct template can require a carrier's full public API while
 allowing extensions through embedding:
@@ -539,6 +547,44 @@ type CustomFile struct {
 	File
 }
 ```
+
+A generic family can retain a package-private witness while resolving the
+complete interface for its actual type argument:
+
+```go
+type CellAPI[T any] interface {
+	Get() T
+	Set(T)
+}
+
+type cellProvider interface {
+	cellContract() reflect.Type
+}
+
+type CellFamily struct{}
+
+func (CellFamily) ContractOf(c cellProvider) reflect.Type {
+	return c.cellContract()
+}
+
+func (*Cell[T]) cellContract() reflect.Type {
+	var _ CellAPI[T] = (*Cell[T])(nil)
+	return reflect.TypeFor[CellAPI[T]]()
+}
+
+func (CellLandmark) Accept() legend.Acceptance {
+	return legend.AcceptContractFamily[CellFamily]()
+}
+```
+
+`CellAPI` is an authored interface; the compiler assertion checks conformance
+and does not generate it. Wrappers may embed `Cell[T]` and add or compatibly
+override methods. The descriptor invokes the owning package's private witness,
+so an unrelated public witness on a wrapper cannot replace it. Each descriptor
+and carrier surrogate starts at zero; metadata methods must work without
+initialized state. Internal embedded pointers and live Subject values are never
+initialized or mutated. Nil or non-interface results, unsupported templates, and
+metadata panics fail population with declaration context.
 
 Population checks acceptance before filling that occurrence's metadata,
 descending, or invoking its capabilities. Legends and regions must still resolve

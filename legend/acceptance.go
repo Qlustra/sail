@@ -31,6 +31,25 @@ func AcceptKind(kind reflect.Kind) Acceptance { return declaration.AcceptKind(ki
 // Invalid contracts fail compilation rather than panicking here.
 func AcceptContract[T any]() Acceptance { return declaration.AcceptContract[T]() }
 
+// ContractFamily selects a carrier's instantiated native interface contract.
+// Family descriptors must be concrete non-pointer structs whose ContractOf
+// method is safe on a zero-valued receiver. Carrier must be an ordinary Go
+// interface; it may include package-private witness methods.
+type ContractFamily[Carrier any] = declaration.ContractFamily[Carrier]
+
+// AcceptContractFamily requires the carrier provider interface, resolves its
+// full contract through a zero-valued Family descriptor and a fresh zero-valued
+// concrete carrier, then checks that contract with Go's implementation rules.
+// Carrier is inferred from Family's ContractOf parameter when omitted.
+//
+// ContractOf must return an ordinary Go interface type and must not depend on
+// initialized state. Interface-typed carriers cannot supply a concrete witness.
+// Self templates are unsupported here; use an instantiated generic interface.
+// This operation never inspects live Subject values or initializes their fields.
+func AcceptContractFamily[Family ContractFamily[Carrier], Carrier any]() Acceptance {
+	return declaration.AcceptContractFamily[Family, Carrier]()
+}
+
 // AcceptanceProvider optionally constrains the carrier type for a Legend,
 // Region, or Landmark. Accept follows the zero-value contract of Mark and runs
 // once per marker declaration type during compilation. The constraint supplements

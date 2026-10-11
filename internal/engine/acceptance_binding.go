@@ -48,6 +48,15 @@ func compileAcceptance(spec decl.Acceptance) (acceptance, error) {
 			return acceptance{}, err
 		}
 		compiled.contract = contract
+	case decl.FamilyContract:
+		if rule.Family.Kind() != reflect.Struct {
+			return acceptance{}, fmt.Errorf("contract family %v must be a concrete non-pointer struct", rule.Family)
+		}
+		provider, err := capability.CompileNativeContract(rule.Type)
+		if err != nil {
+			return acceptance{}, fmt.Errorf("contract family %v provider: %w", rule.Family, err)
+		}
+		compiled.contract = provider
 	default:
 		return acceptance{}, fmt.Errorf("returned an empty acceptance declaration")
 	}
@@ -72,6 +81,37 @@ func (a acceptance) match(carrierType reflect.Type) error {
 		if err := a.contract.Match(typ); err != nil {
 			return fmt.Errorf("expected contract %v, got %v: %w", a.contract.Type(), carrierType, err)
 		}
+	case decl.FamilyContract:
+		return a.matchFamily(carrierType)
+	}
+	return nil
+}
+
+func (a acceptance) matchFamily(carrierType reflect.Type) error {
+	typ := reflectutils.ResolvePointerChain(carrierType)
+	if typ == nil {
+		return fmt.Errorf("cannot resolve carrier type %v for contract family %v", carrierType, a.rule.Family)
+	}
+	if err := a.contract.Match(typ); err != nil {
+		return fmt.Errorf("contract family %v requires provider %v, got %v: %w", a.rule.Family, a.contract.Type(), carrierType, err)
+	}
+	if typ.Kind() == reflect.Interface {
+		return fmt.Errorf("carrier %v cannot supply a concrete zero-valued witness for contract family %v", carrierType, a.rule.Family)
+	}
+
+	candidate := reflect.New(typ).Interface()
+	contractType, err := capability.InvokeDeclaration(a.rule.Family, "ContractOf", func() reflect.Type {
+		return a.rule.Resolve(candidate)
+	})
+	if err != nil {
+		return fmt.Errorf("contract family %v for carrier %v: %w", a.rule.Family, carrierType, err)
+	}
+	contract, err := capability.CompileNativeContract(contractType)
+	if err != nil {
+		return fmt.Errorf("contract family %v returned invalid contract for carrier %v: %w", a.rule.Family, carrierType, err)
+	}
+	if err := contract.Match(typ); err != nil {
+		return fmt.Errorf("contract family %v expected contract %v, got %v: %w", a.rule.Family, contractType, carrierType, err)
 	}
 	return nil
 }
