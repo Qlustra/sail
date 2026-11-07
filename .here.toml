@@ -1,0 +1,8 @@
+[here]
+label = "Sail"
+location = "sail"
+about = "Sail library: grammar authoring, compilation, population, and live Subject propagation."
+
+[where.library-guide]
+path = "readme.md"
+about = "This implementation's vocabulary, lifecycle, public packages, and internal package map."
