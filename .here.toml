@@ -1,12 +1,22 @@
 [here]
 label = "Sail"
 location = "sail"
-about = "Rebuild of Sail's authored grammar compilation and population model on Intel."
+about = "Sail compiles Legend grammars and populates their models from Go Chart declarations."
 policy = "Keep field-use carriers, shared bodies, and mutable population state distinct. Compilation is not population success."
 
 [where.authoring]
 path = "legend/markers.go"
 about = "Public grammar authoring types and recognizable behavior."
+
+[where.navigation]
+path = "survey.go"
+about = "Public typed selectors and Survey rules; Next and Course share these selectors."
+contains = ["next.go", "course.go", "route.go"]
+
+[howto.test]
+run = "task test"
+about = "Verifies the release module and the separate public-import quick start without a Go workspace."
+see = ["Taskfile.yml", "testdata/publicapi/"]
 
 [where.meta-grammar]
 path = "internal/chart/definitions/"
