@@ -71,5 +71,6 @@ Next and prepared Courses, and checked access to a recorded Chart field.
 
 ## Links
 
+- [Sail documentation](https://github.com/Qlustra/sail-docs) — the usage manual.
 - [Sail API](https://pkg.go.dev/github.com/qlustra/sail)
 - [Legend markers](https://pkg.go.dev/github.com/qlustra/sail/legend)
