@@ -1,0 +1,30 @@
+[here]
+label = "Sail"
+location = "sail"
+about = "Rebuild of Sail's authored grammar compilation and population model on Intel."
+policy = "Keep field-use carriers, shared bodies, and mutable population state distinct. Compilation is not population success."
+
+[where.authoring]
+path = "legend/markers.go"
+about = "Public grammar authoring types and recognizable behavior."
+
+[where.meta-grammar]
+path = "internal/chart/definitions/"
+about = "Intel-backed registrations that recognize, validate, and assemble Sail grammar."
+
+[where.compiled-graph]
+path = "internal/chart/declarations/"
+about = "Shared reusable bodies, Lane member views, and declaration graph tracing."
+
+[where.feature-carriers]
+path = "internal/chart/carriers/feature.go"
+about = "Directly constructed Feature field-use data and intrinsic symbol validation."
+
+[where.chart-engine]
+path = "internal/chart/"
+about = "Grammar compilation and lifecycle implementation; exploration, population, and traversal are distinct."
+
+[where.chart-engine.browse]
+depth = 1
+files = true
+limit = 60
