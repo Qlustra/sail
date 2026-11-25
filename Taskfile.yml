@@ -1,0 +1,11 @@
+version: '3'
+
+tasks:
+  test:
+    desc: Run the standalone Sail suite and separate consumer smoke tests
+    env:
+      GOWORK: 'off'
+      GOFLAGS: '-mod=readonly'
+    cmds:
+      - go test -count=1 ./...
+      - go -C testdata/publicapi test -count=1 ./...
